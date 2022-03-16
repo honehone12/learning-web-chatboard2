@@ -15,11 +15,10 @@ func Test_CreateUser(t *testing.T) {
 		Password: "TaroTaroTesting0721",
 	}
 	client := http.DefaultClient
-
 	req, err := common.MakeRequestFromUser(
 		&newUser,
-		"POST",
-		"http://localhost:8081/users/post",
+		http.MethodPost,
+		"http://localhost:8081/signup-account",
 	)
 	if err != nil {
 		log.Panicln(err.Error())
@@ -38,6 +37,6 @@ func Test_CreateUser(t *testing.T) {
 
 	if strings.Compare(newUser.Name, createdUser.Name) != 0 ||
 		strings.Compare(newUser.Email, createdUser.Email) != 0 {
-		log.Panicln(err.Error())
+		log.Panicln("found different fields")
 	}
 }

@@ -1,11 +1,6 @@
 package common
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"log"
-	"net/http"
 	"time"
 )
 
@@ -26,39 +21,31 @@ type Session struct {
 	CreatedAt time.Time `xorm:"not null 'created_at'" json:"created_at"`
 }
 
-func MakeRequestFromUser(
-	user *User,
-	method string,
-	addr string,
-) (req *http.Request, err error) {
-	bin, err := json.Marshal(user)
-	if err != nil {
-		return
-	}
-	req, err = http.NewRequest(
-		method,
-		addr,
-		bytes.NewBuffer(bin),
-	)
-	if err != nil {
-		return
-	}
-	req.Header.Add(
-		"Content-Type",
-		"application/json",
-	)
-	return
+type Thread struct {
+	Id         uint      `xorm:"pk autoincr 'id'" json:"id"`
+	UuId       string    `xorm:"not null unique 'uu_id'" json:"uuid"`
+	Topic      string    `xorm:"TEXT 'topic'" json:"topic"`
+	NumReplies uint      `xorm:"num_replies" json:"num_replies"`
+	Owner      string    `xorm:"owner" json:"owner"`
+	UserId     uint      `xorm:"user_id" json:"user_id"`
+	LastUpdate time.Time `xorm:"not null 'last_update'" json:"last_update"`
+	CreatedAt  time.Time `xorm:"not null 'created_at'" json:"created_at"`
 }
 
-func MakeUserFromResponse(res *http.Response) (user *User, err error) {
-	user = &User{}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
-	if err = json.Unmarshal(body, user); err != nil {
-		log.Fatalln(err.Error())
-	}
-	return
+type Post struct {
+	Id          uint      `xorm:"ok autoincr 'id'" json:"id"`
+	UuId        string    `xorm:"not null unique 'uu_id'" json:"uuid"`
+	Body        string    `xorm:"TEXT 'body'" json:"body"`
+	Contributor string    `xorm:"contributor" json:"contributor"`
+	UserId      uint      `xorm:"user_id" json:"user_id"`
+	ThreadId    uint      `xorm:"thread_id" json:"thread_id"`
+	CreatedAt   time.Time `xorm:"not null 'created_at'" json:"created_at"`
+}
+
+func (thread *Thread) When() string {
+	return thread.CreatedAt.Format("2006/Jan/2 at 3:04pm")
+}
+
+func (post *Post) When() string {
+	return post.CreatedAt.Format("2006/Jan/2 at 3:04pm")
 }

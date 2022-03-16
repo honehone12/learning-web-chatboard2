@@ -9,15 +9,18 @@ import (
 )
 
 var dbEngine *xorm.Engine
+var config *common.Configuration
+var logger *log.Logger
 
 func main() {
+	var err error
 	// config
-	config, err := common.LoadConfig()
+	config, err = common.LoadConfig()
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
 	//log
-	logger, err := common.OpenLogger(
+	logger, err = common.OpenLogger(
 		config.LogToFile,
 		config.LogFileNameUsers,
 	)
@@ -26,7 +29,7 @@ func main() {
 	}
 	//database
 	dbEngine, err = common.OpenDb(
-		config.DbNameUsers,
+		config.DbName,
 		config.ShowSQL,
 		0,
 	)
@@ -35,8 +38,8 @@ func main() {
 	}
 	//router
 	routeEngine := gin.Default()
-	usersRoute := routeEngine.Group("/users")
-	usersRoute.POST("/post", CreateUser)
-	//should address be in envs or args ??
+	routeEngine.POST("/signup-account", CreateUser)
+	routeEngine.POST("/create-session", CreateSession)
+
 	routeEngine.Run(config.AddressUsers)
 }

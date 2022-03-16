@@ -1,10 +1,11 @@
 {
-    "address_users": ":8081",
-    "address_threads": ":8082",
-    "db_name_users": "chatboard_users",
-    "db_name_threads": "chatboard_threads",
+    "address_router": "localhost:8080",
+    "address_users": "localhost:8081",
+    "address_threads": "localhost:8082",
+    "db_name": "chatboard",
     "show_sql": true,
     "log_to_file": false,
+    "log_file_name_router": "router.log",
     "log_file_name_users": "users.log",
     "log_file_name_threads": "threads.log" 
 }
