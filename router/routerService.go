@@ -234,11 +234,11 @@ func signupPost(ctx *gin.Context) {
 }
 
 func authenticatePost(ctx *gin.Context) {
-	authUser := &common.User{
+	authUser := common.User{
 		Email: ctx.PostForm("email"),
 	}
 	req, err := common.MakeRequestFromUser(
-		authUser,
+		&authUser,
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
@@ -321,9 +321,9 @@ func authenticatePost(ctx *gin.Context) {
 
 func threadGet(ctx *gin.Context) {
 	uuid := ctx.Query("id")
-	thre := &common.Thread{UuId: uuid}
+	thre := common.Thread{UuId: uuid}
 	req, err := common.MakeRequestFromThread(
-		thre,
+		&thre,
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
@@ -347,7 +347,7 @@ func threadGet(ctx *gin.Context) {
 		errorRedirect(ctx, readThreadFailMsg)
 		return
 	}
-	thre, err = common.MakeThreadFromResponse(res)
+	threPtr, err := common.MakeThreadFromResponse(res)
 	if err != nil {
 		common.LogError(logger).Println(err.Error())
 		errorRedirect(ctx, readThreadFailMsg)
@@ -355,7 +355,7 @@ func threadGet(ctx *gin.Context) {
 	}
 
 	req, err = common.MakeRequestFromThread(
-		thre,
+		threPtr,
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
@@ -408,7 +408,7 @@ func threadGet(ctx *gin.Context) {
 		"thread.html",
 		gin.H{
 			"navbar": navbar,
-			"thread": thre,
+			"thread": threPtr,
 			"reply":  reply,
 			"posts":  posts,
 			"token":  "easy-token",
@@ -541,9 +541,9 @@ func newReplyPost(ctx *gin.Context) {
 		return
 	}
 
-	thre := &common.Thread{UuId: threUuId}
+	thre := common.Thread{UuId: threUuId}
 	req, err = common.MakeRequestFromThread(
-		thre,
+		&thre,
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
@@ -567,16 +567,16 @@ func newReplyPost(ctx *gin.Context) {
 		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	}
-	thre, err = common.MakeThreadFromResponse(res)
+	threPtr, err := common.MakeThreadFromResponse(res)
 	if err != nil {
 		common.LogError(logger).Println(err.Error())
 		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	}
-	thre.NumReplies++
+	threPtr.NumReplies++
 
 	req, err = common.MakeRequestFromThread(
-		thre,
+		threPtr,
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",

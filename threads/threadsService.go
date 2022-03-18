@@ -42,7 +42,7 @@ func createThread(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, createTreadFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, newThre)
+	ctx.JSON(http.StatusOK, &newThre)
 }
 
 func createPost(ctx *gin.Context) {
@@ -67,7 +67,7 @@ func createPost(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, createPostFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, post)
+	ctx.JSON(http.StatusOK, &post)
 }
 
 func readAThread(ctx *gin.Context) {
@@ -89,7 +89,7 @@ func readAThread(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, readAThreadFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, thre)
+	ctx.JSON(http.StatusOK, &thre)
 }
 
 func updateThread(ctx *gin.Context) {
@@ -111,7 +111,7 @@ func updateThread(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, updateTreadFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, thre)
+	ctx.JSON(http.StatusOK, &thre)
 }
 
 func readPostsInThread(ctx *gin.Context) {
@@ -129,7 +129,7 @@ func readPostsInThread(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, readAThreadFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, posts)
+	ctx.JSON(http.StatusOK, &posts)
 }
 
 func readThreads(ctx *gin.Context) {
@@ -138,7 +138,7 @@ func readThreads(ctx *gin.Context) {
 		common.LogError(logger).Println(err.Error())
 		ctx.String(http.StatusInternalServerError, readAThreadFailMsg)
 	} else {
-		ctx.JSON(http.StatusOK, thres)
+		ctx.JSON(http.StatusOK, &thres)
 	}
 }
 

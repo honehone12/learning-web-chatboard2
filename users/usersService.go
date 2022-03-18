@@ -47,11 +47,11 @@ func createUser(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, createUserFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, newUser)
+	ctx.JSON(http.StatusOK, &newUser)
 }
 
 func createSession(ctx *gin.Context) {
-	sessUser := common.User{}
+	var sessUser common.User
 	err := ctx.Bind(&sessUser)
 	if err != nil {
 		common.LogError(logger).Println(err.Error())
@@ -69,7 +69,7 @@ func createSession(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, createSessionFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, *sess)
+	ctx.JSON(http.StatusOK, sess)
 }
 
 func readUser(ctx *gin.Context) {
@@ -91,7 +91,7 @@ func readUser(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, readUserFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, searchUser)
+	ctx.JSON(http.StatusOK, &searchUser)
 }
 
 func readSession(ctx *gin.Context) {
@@ -113,7 +113,7 @@ func readSession(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, readSessionFailMsg)
 		return
 	}
-	ctx.JSON(http.StatusOK, searchSess)
+	ctx.JSON(http.StatusOK, &searchSess)
 }
 
 func deleteSession(ctx *gin.Context) {
