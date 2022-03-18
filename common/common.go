@@ -235,3 +235,35 @@ func MakeThreadFromResponse(res *http.Response) (thre *Thread, err error) {
 	err = json.Unmarshal(body, thre)
 	return
 }
+
+func MakeRequestFromPost(
+	post *Post,
+	method string,
+	addr string,
+) (req *http.Request, err error) {
+	bin, err := json.Marshal(post)
+	if err != nil {
+		return
+	}
+	req, err = http.NewRequest(
+		method,
+		addr,
+		bytes.NewBuffer(bin),
+	)
+	if err != nil {
+		return
+	}
+	req.Header.Add("Content-Type", "application/json")
+	return
+}
+
+func MakePostFromResponse(res *http.Response) (post *Post, err error) {
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return
+	}
+	post = &Post{}
+	err = json.Unmarshal(body, post)
+	return
+}

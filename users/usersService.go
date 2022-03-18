@@ -19,10 +19,12 @@ const (
 	createUserFailMsg    = "failed to create user"
 	createSessionFailMsg = "failed to create session"
 	readUserFailMsg      = "failed to find user"
+	readSessionFailMsg   = "failed to find session"
+	deleteSessionFailMsg = "failed to delete session"
 )
 
 // don't forget TLS
-func CreateUser(ctx *gin.Context) {
+func createUser(ctx *gin.Context) {
 	var newUser common.User
 	err := ctx.Bind(&newUser)
 	if err != nil {
@@ -48,7 +50,7 @@ func CreateUser(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, newUser)
 }
 
-func CreateSession(ctx *gin.Context) {
+func createSession(ctx *gin.Context) {
 	sessUser := common.User{}
 	err := ctx.Bind(&sessUser)
 	if err != nil {
@@ -70,7 +72,7 @@ func CreateSession(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, *sess)
 }
 
-func ReadUser(ctx *gin.Context) {
+func readUser(ctx *gin.Context) {
 	var searchUser common.User
 	err := ctx.Bind(&searchUser)
 	if err != nil {
@@ -78,7 +80,7 @@ func ReadUser(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, readUserFailMsg)
 		return
 	}
-	if common.IsEmpty(searchUser.Email, searchUser.UuId) {
+	if common.IsEmpty(searchUser.Email) && common.IsEmpty(searchUser.UuId) {
 		common.LogError(logger).Println("need email or uuid for finding user")
 		ctx.String(http.StatusBadRequest, readUserFailMsg)
 		return
@@ -90,6 +92,50 @@ func ReadUser(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, searchUser)
+}
+
+func readSession(ctx *gin.Context) {
+	var searchSess common.Session
+	err := ctx.Bind(&searchSess)
+	if err != nil {
+		common.LogError(logger).Println(err.Error())
+		ctx.String(http.StatusBadRequest, readSessionFailMsg)
+		return
+	}
+	if common.IsEmpty(searchSess.UuId) {
+		common.LogError(logger).Println("need uuid for finding session")
+		ctx.String(http.StatusBadRequest, readSessionFailMsg)
+		return
+	}
+	err = readSessionInternal(&searchSess)
+	if err != nil {
+		common.LogError(logger).Println(err.Error())
+		ctx.String(http.StatusBadRequest, readSessionFailMsg)
+		return
+	}
+	ctx.JSON(http.StatusOK, searchSess)
+}
+
+func deleteSession(ctx *gin.Context) {
+	var delSess common.Session
+	err := ctx.Bind(&delSess)
+	if err != nil {
+		common.LogError(logger).Println(err.Error())
+		ctx.String(http.StatusBadRequest, readSessionFailMsg)
+		return
+	}
+	if common.IsEmpty(delSess.UuId) {
+		common.LogError(logger).Println("need uuid for finding session")
+		ctx.String(http.StatusBadRequest, readSessionFailMsg)
+		return
+	}
+	err = deleteSessionInternal(&delSess)
+	if err != nil {
+		common.LogError(logger).Println(err.Error())
+		ctx.String(http.StatusBadRequest, readSessionFailMsg)
+		return
+	}
+	ctx.String(http.StatusOK, "deleted")
 }
 
 // don't forget TLS
@@ -121,7 +167,7 @@ func createSessionInternal(sessUser *common.User) (session *common.Session, err 
 		InsertOne(session)
 	if err == nil && affected != 1 {
 		err = fmt.Errorf(
-			"something wrong. returned value was %d",
+			"something's wrong. returned value was %d",
 			affected,
 		)
 	}
@@ -135,6 +181,30 @@ func readUserInternal(searchUser *common.User) (err error) {
 		Get(searchUser)
 	if err == nil && !ok {
 		err = errors.New("no such users")
+	}
+	return
+}
+
+func readSessionInternal(searchSess *common.Session) (err error) {
+	var ok bool
+	ok, err = dbEngine.
+		Table(SessionTable).
+		Get(searchSess)
+	if err == nil && !ok {
+		err = errors.New("no such session")
+	}
+	return
+}
+
+func deleteSessionInternal(delSess *common.Session) (err error) {
+	affected, err := dbEngine.
+		Table(SessionTable).
+		Delete(delSess)
+	if err == nil && affected != 1 {
+		err = fmt.Errorf(
+			"something's wrong. returned value was %d",
+			affected,
+		)
 	}
 	return
 }

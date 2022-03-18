@@ -38,8 +38,12 @@ func main() {
 	}
 	//router
 	routeEngine := gin.Default()
-	routeEngine.POST("/create", CreateThread)
-	routeEngine.GET("/read-index", ReadThreads)
+	routeEngine.POST("/create", createThread)
+	routeEngine.POST("/create-post", createPost)
+	routeEngine.POST("/read", readAThread)
+	routeEngine.POST("/read-posts", readPostsInThread)
+	routeEngine.GET("/read-index", readThreads)
+	routeEngine.POST("/update", updateThread)
 
 	routeEngine.Run(config.AddressThreads)
 }

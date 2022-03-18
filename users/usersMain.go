@@ -38,8 +38,11 @@ func main() {
 	}
 	//router
 	routeEngine := gin.Default()
-	routeEngine.POST("/signup-account", CreateUser)
-	routeEngine.POST("/create-session", CreateSession)
+	routeEngine.POST("/signup-account", createUser)
+	routeEngine.POST("/create-session", createSession)
+	routeEngine.POST("/authenticate", readUser)
+	routeEngine.POST("/check-session", readSession)
+	routeEngine.POST("/delete-session", deleteSession)
 
 	routeEngine.Run(config.AddressUsers)
 }

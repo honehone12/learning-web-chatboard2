@@ -30,6 +30,7 @@ func main() {
 
 	//gin
 	webEngine := gin.Default()
+	webEngine.Use(LoggedInCheckerMiddleware)
 	// setup templates
 	webEngine.Static("/static", "./public")
 	webEngine.Delims("{{", "}}")
@@ -45,7 +46,11 @@ func main() {
 	usersRoute.POST("/signup-account", signupPost)
 	usersRoute.POST("/authenticate", authenticatePost)
 
-	//threadsRoute := webEngine.Group("/thread")
+	threadsRoute := webEngine.Group("/thread")
+	threadsRoute.GET("/read", threadGet)
+	threadsRoute.GET("/new", newThreadGet)
+	threadsRoute.POST("/create", newThreadPost)
+	threadsRoute.POST("/post", newReplyPost)
 
 	httpClient = http.DefaultClient
 	webEngine.Run(config.AdressRouter)
