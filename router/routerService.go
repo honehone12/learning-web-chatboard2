@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -55,16 +56,41 @@ const (
 	ShortTimeSession = "short-time"
 )
 
-const (
-	readThreadFailMsg   = "failed to read thread"
-	postThreadFailMsg   = "failed to post thread"
-	signupFailMsg       = "failed to sign-up"
-	authenticateFailMsg = "failed to authenticate"
-	logoutFailMsg       = "failed to logout"
-	replyPostFaileMsg   = "failed to reply"
-)
+func handleErrorInternal(
+	loggerErrorMsg string,
+	ctx *gin.Context,
+	publicErrorMsg string,
+) {
+	common.LogError(logger).Println(loggerErrorMsg)
+	errorRedirect(ctx, publicErrorMsg)
+}
+
+func getHTMLElemntInternal(isLoggedin bool) (template.HTML, template.HTML) {
+	if isLoggedin {
+		return privateNavbar, replyForm
+	} else {
+		return publicNavbar, ""
+	}
+}
 
 func indexGet(ctx *gin.Context) {
+	thres, err := indexGetInternal(ctx)
+	if err != nil {
+		handleErrorInternal(err.Error(), ctx, "failed to read thread")
+		return
+	}
+	navbar, _ := getHTMLElemntInternal(ConfirmLoggedIn(ctx))
+	ctx.HTML(
+		http.StatusOK,
+		"index.html",
+		gin.H{
+			"navbar":  navbar,
+			"threads": thres,
+		},
+	)
+}
+
+func indexGetInternal(ctx *gin.Context) (threads []common.Thread, err error) {
 	req, err := http.NewRequest(
 		http.MethodGet,
 		fmt.Sprintf(
@@ -76,49 +102,22 @@ func indexGet(ctx *gin.Context) {
 		nil,
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, readThreadFailMsg)
+		err = errors.New(res.Status)
 		return
 	}
 	defer res.Body.Close()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	}
-	thres := make([]common.Thread, 0)
-	err = json.Unmarshal(body, &thres)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
-		return
-	}
-
-	var navbar template.HTML
-	if ConfirmLoggedIn(ctx) {
-		navbar = privateNavbar
-	} else {
-		navbar = publicNavbar
-	}
-	ctx.HTML(
-		http.StatusOK,
-		"index.html",
-		gin.H{
-			"navbar":  navbar,
-			"threads": thres,
-		},
-	)
+	err = json.Unmarshal(body, &threads)
+	return
 }
 
 func errorRedirect(ctx *gin.Context, msg string) {
@@ -134,12 +133,7 @@ func errorRedirect(ctx *gin.Context, msg string) {
 
 func errorGet(ctx *gin.Context) {
 	errMsg := ctx.Query("msg")
-	var navbar template.HTML
-	if ConfirmLoggedIn(ctx) {
-		navbar = privateNavbar
-	} else {
-		navbar = publicNavbar
-	}
+	navbar, _ := getHTMLElemntInternal(ConfirmLoggedIn(ctx))
 	ctx.HTML(
 		http.StatusOK,
 		"error.html",
@@ -168,42 +162,53 @@ func signupGet(ctx *gin.Context) {
 
 func logoutGet(ctx *gin.Context) {
 	if ConfirmLoggedIn(ctx) {
-		uuid, _ := ctx.Cookie(ShortTimeSession)
-		sess := &common.Session{UuId: uuid}
-		req, err := common.MakeRequestFromSession(
-			sess,
-			http.MethodPost,
-			fmt.Sprintf(
-				"%s%s%s",
-				Http,
-				config.AddressUsers,
-				"/delete-session",
-			),
-		)
+		err := logoutGetInternal(ctx)
 		if err != nil {
-			common.LogError(logger).Println(err.Error())
-			errorRedirect(ctx, logoutFailMsg)
-			return
-		}
-		res, err := httpClient.Do(req)
-		if err != nil {
-			common.LogError(logger).Println(err.Error())
-			errorRedirect(ctx, logoutFailMsg)
-			return
-		} else if res.StatusCode != http.StatusOK {
-			common.LogError(logger).Println(res.Status)
-			errorRedirect(ctx, logoutFailMsg)
+			handleErrorInternal(err.Error(), ctx, "failed to logout")
 			return
 		}
 	}
 	ctx.Redirect(http.StatusFound, "/")
 }
 
+func logoutGetInternal(ctx *gin.Context) (err error) {
+	uuid, _ := ctx.Cookie(ShortTimeSession)
+	sess := &common.Session{UuId: uuid}
+	req, err := common.MakeRequestFromSession(
+		sess,
+		http.MethodPost,
+		fmt.Sprintf(
+			"%s%s%s",
+			Http,
+			config.AddressUsers,
+			"/delete-session",
+		),
+	)
+	if err != nil {
+		return
+	}
+	res, err := httpClient.Do(req)
+	if err == nil && res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
+	}
+	return
+}
+
 func signupPost(ctx *gin.Context) {
+	err := signupPostInternal(ctx)
+	if err != nil {
+		handleErrorInternal(err.Error(), ctx, "failed to sign-up")
+		return
+	}
+	ctx.Redirect(http.StatusFound, "/user/login")
+}
+
+func signupPostInternal(ctx *gin.Context) (err error) {
+	pw := processPassword(ctx.PostForm("password"))
 	newUser := common.User{
 		Name:     ctx.PostForm("name"),
 		Email:    ctx.PostForm("email"),
-		Password: ctx.PostForm("password"),
+		Password: pw,
 	}
 	req, err := common.MakeRequestFromUser(
 		&newUser,
@@ -216,24 +221,25 @@ func signupPost(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, signupFailMsg)
 		return
 	}
 	res, err := httpClient.Do(req)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, signupFailMsg)
-		return
-	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, signupFailMsg)
-		return
+	if err == nil && res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
 	}
-	ctx.Redirect(http.StatusFound, "/user/login")
+	return
 }
 
 func authenticatePost(ctx *gin.Context) {
+	err := authenticatePostInternal(ctx)
+	if err != nil {
+		handleErrorInternal(err.Error(), ctx, "failed to authenticate")
+		return
+	}
+	ctx.Redirect(http.StatusFound, "/")
+}
+
+func authenticatePostInternal(ctx *gin.Context) (err error) {
 	authUser := common.User{
 		Email: ctx.PostForm("email"),
 	}
@@ -248,29 +254,22 @@ func authenticatePost(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, authenticateFailMsg)
 		return
 	}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, authenticateFailMsg)
 		return
 	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, authenticateFailMsg)
+		err = errors.New(res.Status)
 		return
 	}
 	authedUser, err := common.MakeUserFromResponse(res)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, authenticateFailMsg)
+		return
 	}
-	pass := common.Encrypt(ctx.PostForm("password"))
-	if strings.Compare(authedUser.Password, pass) != 0 {
-		common.LogError(logger).Println("password mismatch")
-		errorRedirect(ctx, authenticateFailMsg)
+	pw := processPassword(ctx.PostForm("password"))
+	if strings.Compare(authedUser.Password, pw) != 0 {
+		err = errors.New("password mismatch")
 		return
 	}
 
@@ -285,27 +284,22 @@ func authenticatePost(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, authenticateFailMsg)
 		return
 	}
 	res, err = httpClient.Do(req)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, authenticateFailMsg)
 		return
 	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, authenticateFailMsg)
+		err = errors.New(res.Status)
 		return
 	}
 	session, err := common.MakeSessionFromResponse(res)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, authenticateFailMsg)
 		return
 	}
 
+	/////////////////////////////////////////////
+	//session cookie
 	ctx.SetSameSite(http.SameSiteStrictMode)
 	ctx.SetCookie(
 		ShortTimeSession,
@@ -316,10 +310,30 @@ func authenticatePost(ctx *gin.Context) {
 		true,
 		true,
 	)
-	ctx.Redirect(http.StatusFound, "/")
+	return
 }
 
 func threadGet(ctx *gin.Context) {
+	thre, posts, err := threadGetInternal(ctx)
+	if err != nil {
+		handleErrorInternal(err.Error(), ctx, "failed to read thread")
+		return
+	}
+	navbar, reply := getHTMLElemntInternal(ConfirmLoggedIn(ctx))
+	ctx.HTML(
+		http.StatusOK,
+		"thread.html",
+		gin.H{
+			"navbar": navbar,
+			"thread": thre,
+			"reply":  reply,
+			"posts":  posts,
+			"token":  "easy-token",
+		},
+	)
+}
+
+func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.Post, err error) {
 	uuid := ctx.Query("id")
 	thre := common.Thread{UuId: uuid}
 	req, err := common.MakeRequestFromThread(
@@ -333,29 +347,22 @@ func threadGet(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, readThreadFailMsg)
+		err = errors.New(res.Status)
 		return
 	}
-	threPtr, err := common.MakeThreadFromResponse(res)
+	thread, err = common.MakeThreadFromResponse(res)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	}
 
 	req, err = common.MakeRequestFromThread(
-		threPtr,
+		thread,
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
@@ -365,64 +372,33 @@ func threadGet(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	}
 	res, err = httpClient.Do(req)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, readThreadFailMsg)
+		err = errors.New(res.Status)
 		return
 	}
 	defer res.Body.Close()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
 		return
 	}
-	posts := make([]common.Post, 0)
 	err = json.Unmarshal(body, &posts)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, readThreadFailMsg)
-		return
-	}
-
-	var navbar template.HTML
-	var reply template.HTML
-	if ConfirmLoggedIn(ctx) {
-		navbar = privateNavbar
-		reply = replyForm
-	} else {
-		navbar = publicNavbar
-		reply = ""
-	}
-	ctx.HTML(
-		http.StatusOK,
-		"thread.html",
-		gin.H{
-			"navbar": navbar,
-			"thread": threPtr,
-			"reply":  reply,
-			"posts":  posts,
-			"token":  "easy-token",
-		},
-	)
+	return
 }
 
 func newThreadGet(ctx *gin.Context) {
-	if ConfirmLoggedIn(ctx) {
+	loggedin := ConfirmLoggedIn(ctx)
+	navbar, _ := getHTMLElemntInternal(loggedin)
+	if loggedin {
 		ctx.HTML(
 			http.StatusOK,
 			"newthread.html",
 			gin.H{
-				"navbar": privateNavbar,
+				"navbar": navbar,
 			},
 		)
 	} else {
@@ -436,9 +412,18 @@ func newThreadPost(ctx *gin.Context) {
 		return
 	}
 
+	err := newThreadPostInternal(ctx)
+	if err != nil {
+		handleErrorInternal(err.Error(), ctx, "failed to post thread")
+		return
+	}
+
+	ctx.Redirect(http.StatusFound, "/")
+}
+
+func newThreadPostInternal(ctx *gin.Context) (err error) {
 	sess, err := GetSessionPtr(ctx)
 	if err != nil {
-		errorRedirect(ctx, postThreadFailMsg)
 		return
 	}
 
@@ -458,22 +443,13 @@ func newThreadPost(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, postThreadFailMsg)
 		return
 	}
 	res, err := httpClient.Do(req)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, postThreadFailMsg)
-		return
-	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, postThreadFailMsg)
-		return
+	if err == nil && res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
 	}
-
-	ctx.Redirect(http.StatusFound, "/")
+	return
 }
 
 func newReplyPost(ctx *gin.Context) {
@@ -482,6 +458,16 @@ func newReplyPost(ctx *gin.Context) {
 		return
 	}
 
+	threUuId, err := newReplyPostInternal(ctx)
+	if err != nil {
+		handleErrorInternal(err.Error(), ctx, "failed to reply")
+		return
+	}
+	ctx.Redirect(http.StatusFound, fmt.Sprint("/thread/read?id=", threUuId))
+}
+
+func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
+	////////////////////////////////////////////////
 	// token must be changed everytime and
 	// we have to remember token.
 	token := ctx.PostForm("token")
@@ -492,7 +478,6 @@ func newReplyPost(ctx *gin.Context) {
 
 	sess, err := GetSessionPtr(ctx)
 	if err != nil {
-		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	}
 
@@ -500,12 +485,10 @@ func newReplyPost(ctx *gin.Context) {
 	/////////////////////////////////////////
 	// here means uuid and id are now public info
 	// should be encrypted
-	// or use cookie
-	threUuId := ctx.PostForm("uuid")
+	// or use (session) cookie
+	threUuId = ctx.PostForm("uuid")
 	threId, err := strconv.Atoi(ctx.PostForm("id"))
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	}
 
@@ -526,18 +509,13 @@ func newReplyPost(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, replyPostFaileMsg)
+		err = errors.New(res.Status)
 		return
 	}
 
@@ -553,24 +531,17 @@ func newReplyPost(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	}
 	res, err = httpClient.Do(req)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, replyPostFaileMsg)
+		err = errors.New(res.Status)
 		return
 	}
 	threPtr, err := common.MakeThreadFromResponse(res)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	}
 	threPtr.NumReplies++
@@ -586,20 +557,11 @@ func newReplyPost(ctx *gin.Context) {
 		),
 	)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, replyPostFaileMsg)
 		return
 	}
 	res, err = httpClient.Do(req)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		errorRedirect(ctx, replyPostFaileMsg)
-		return
-	} else if res.StatusCode != http.StatusOK {
-		common.LogError(logger).Println(res.Status)
-		errorRedirect(ctx, replyPostFaileMsg)
-		return
+	if err == nil && res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
 	}
-
-	ctx.Redirect(http.StatusFound, fmt.Sprint("/thread/read?id=", threUuId))
+	return
 }

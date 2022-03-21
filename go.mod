@@ -3,6 +3,7 @@ module learning-web-chatboard2
 go 1.17
 
 require (
+	github.com/gin-gonic/gin v1.7.7
 	github.com/google/uuid v1.0.0
 	github.com/lib/pq v1.10.4
 	xorm.io/xorm v1.2.5
@@ -10,7 +11,6 @@ require (
 
 require (
 	github.com/gin-contrib/sse v0.1.0 // indirect
-	github.com/gin-gonic/gin v1.7.7 // indirect
 	github.com/go-playground/locales v0.13.0 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/go-playground/validator/v10 v10.4.1 // indirect

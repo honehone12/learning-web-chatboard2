@@ -16,133 +16,136 @@ const (
 	DescendingUpdate = "last_update"
 )
 
-const (
-	createTreadFailMsg = "failed to create thread"
-	createPostFailMsg  = "failed to create post"
-	readAThreadFailMsg = "failed to read thread"
-	updateTreadFailMsg = "failed to update thread"
-)
+func handleErrorInternal(
+	loggerErrorMsg string,
+	ctx *gin.Context,
+) {
+	common.LogError(logger).Println(loggerErrorMsg)
+	ctx.String(http.StatusBadRequest, "error")
+}
 
 func createThread(ctx *gin.Context) {
 	var newThre common.Thread
-	err := ctx.Bind(&newThre)
+	err := createThreadInternal(ctx, &newThre)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, createTreadFailMsg)
-		return
-	}
-	if common.IsEmpty(newThre.Topic, newThre.Owner) {
-		common.LogError(logger).Println("contains empty string")
-		ctx.String(http.StatusBadRequest, createTreadFailMsg)
-		return
-	}
-	err = createThreadInternal(&newThre)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, createTreadFailMsg)
+		handleErrorInternal("failed to create thread", ctx)
 		return
 	}
 	ctx.JSON(http.StatusOK, &newThre)
 }
 
+func createThreadInternal(ctx *gin.Context, newThre *common.Thread) (err error) {
+	err = ctx.Bind(newThre)
+	if err != nil {
+		return
+	}
+	if common.IsEmpty(newThre.Topic, newThre.Owner) {
+		err = errors.New("contains empty string")
+		return
+	}
+	err = createThreadSQLInternal(newThre)
+	return
+}
+
 func createPost(ctx *gin.Context) {
 	var post common.Post
-	err := ctx.Bind(&post)
+	err := createPostInternal(ctx, &post)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, createPostFailMsg)
+		handleErrorInternal(err.Error(), ctx)
+		return
+	}
+	ctx.JSON(http.StatusOK, &post)
+}
+
+func createPostInternal(ctx *gin.Context, post *common.Post) (err error) {
+	err = ctx.Bind(post)
+	if err != nil {
 		return
 	}
 	if common.IsEmpty(
 		post.Body,
 		post.Contributor,
 	) {
-		common.LogError(logger).Println("contains empty string")
-		ctx.String(http.StatusBadRequest, createPostFailMsg)
+		err = errors.New("contains empty string")
 		return
 	}
-	err = createPostInternal(&post)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, createPostFailMsg)
-		return
-	}
-	ctx.JSON(http.StatusOK, &post)
+	err = createPostSQLInternal(post)
+	return
 }
 
 func readAThread(ctx *gin.Context) {
 	var thre common.Thread
-	err := ctx.Bind(&thre)
+	err := readAThreadInternal(ctx, &thre)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, readAThreadFailMsg)
-		return
-	}
-	if common.IsEmpty(thre.UuId) {
-		common.LogError(logger).Println("need uuid for finding thread")
-		ctx.String(http.StatusBadRequest, readAThreadFailMsg)
-		return
-	}
-	err = readAThreadInternal(&thre)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, readAThreadFailMsg)
+		handleErrorInternal(err.Error(), ctx)
 		return
 	}
 	ctx.JSON(http.StatusOK, &thre)
 }
 
+func readAThreadInternal(ctx *gin.Context, thre *common.Thread) (err error) {
+	err = ctx.Bind(thre)
+	if err != nil {
+		return
+	}
+	if common.IsEmpty(thre.UuId) {
+		err = errors.New("need uuid for finding thread")
+		return
+	}
+	err = readAThreadSQLInternal(thre)
+	return
+}
+
 func updateThread(ctx *gin.Context) {
 	var thre common.Thread
-	err := ctx.Bind(&thre)
+	err := updateThreadInternal(ctx, &thre)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, updateTreadFailMsg)
-		return
-	}
-	if common.IsEmpty(thre.UuId, thre.Topic, thre.Owner) {
-		common.LogError(logger).Println("contains empty string")
-		ctx.String(http.StatusBadRequest, updateTreadFailMsg)
-		return
-	}
-	err = updateThreadInternal(&thre)
-	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, updateTreadFailMsg)
+		handleErrorInternal(err.Error(), ctx)
 		return
 	}
 	ctx.JSON(http.StatusOK, &thre)
+}
+
+func updateThreadInternal(ctx *gin.Context, thre *common.Thread) (err error) {
+	err = ctx.Bind(thre)
+	if err != nil {
+		return
+	}
+	if common.IsEmpty(thre.UuId, thre.Topic, thre.Owner) {
+		err = errors.New("contains empty string")
+		return
+	}
+	err = updateThreadSQLInternal(thre)
+	return
 }
 
 func readPostsInThread(ctx *gin.Context) {
 	var thre common.Thread
 	err := ctx.Bind(&thre)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, readAThreadFailMsg)
+		handleErrorInternal(err.Error(), ctx)
 		return
 	}
 	// is there a way to check valid id before?
-	posts, err := readPostsInThreadInternal(&thre)
+	posts, err := readPostsInThreadSQLInternal(&thre)
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusBadRequest, readAThreadFailMsg)
+		handleErrorInternal(err.Error(), ctx)
 		return
 	}
 	ctx.JSON(http.StatusOK, &posts)
 }
 
 func readThreads(ctx *gin.Context) {
-	thres, err := readThreadsInternal()
+	thres, err := readThreadsSQLInternal()
 	if err != nil {
-		common.LogError(logger).Println(err.Error())
-		ctx.String(http.StatusInternalServerError, readAThreadFailMsg)
+		handleErrorInternal(err.Error(), ctx)
+		return
 	} else {
 		ctx.JSON(http.StatusOK, &thres)
 	}
 }
 
-func createThreadInternal(newThre *common.Thread) (err error) {
+func createThreadSQLInternal(newThre *common.Thread) (err error) {
 	now := time.Now()
 	newThre.UuId = common.NewUuIdString()
 	newThre.LastUpdate = now
@@ -160,7 +163,7 @@ func createThreadInternal(newThre *common.Thread) (err error) {
 	return
 }
 
-func createPostInternal(newPost *common.Post) (err error) {
+func createPostSQLInternal(newPost *common.Post) (err error) {
 	newPost.UuId = common.NewUuIdString()
 	newPost.CreatedAt = time.Now()
 
@@ -176,7 +179,7 @@ func createPostInternal(newPost *common.Post) (err error) {
 	return
 }
 
-func readThreadsInternal() (threads []common.Thread, err error) {
+func readThreadsSQLInternal() (threads []common.Thread, err error) {
 	err = dbEngine.
 		Table(ThreadsTable).
 		Desc(DescendingUpdate).
@@ -184,7 +187,7 @@ func readThreadsInternal() (threads []common.Thread, err error) {
 	return
 }
 
-func readAThreadInternal(thread *common.Thread) (err error) {
+func readAThreadSQLInternal(thread *common.Thread) (err error) {
 	ok, err := dbEngine.
 		Table(ThreadsTable).
 		Get(thread)
@@ -194,7 +197,7 @@ func readAThreadInternal(thread *common.Thread) (err error) {
 	return
 }
 
-func updateThreadInternal(thread *common.Thread) (err error) {
+func updateThreadSQLInternal(thread *common.Thread) (err error) {
 	thread.LastUpdate = time.Now()
 
 	affected, err := dbEngine.
@@ -210,7 +213,7 @@ func updateThreadInternal(thread *common.Thread) (err error) {
 	return
 }
 
-func readPostsInThreadInternal(thread *common.Thread) (posts []common.Post, err error) {
+func readPostsInThreadSQLInternal(thread *common.Thread) (posts []common.Post, err error) {
 	err = dbEngine.
 		Table(PostsTable).
 		Where("thread_id = ?", thread.Id).

@@ -2,7 +2,6 @@ package common
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -123,12 +122,6 @@ func LogError(logger *log.Logger) *log.Logger {
 func NewUuIdString() string {
 	raw := uuid.New()
 	return raw.String()
-}
-
-func Encrypt(plainText string) (crypted string) {
-	asBytes := sha256.Sum256([]byte(plainText))
-	crypted = fmt.Sprintf("%x", asBytes)
-	return
 }
 
 func IsEmpty(str ...string) bool {

@@ -1,14 +1,38 @@
 package main
 
 import (
+	"crypto/rand"
+	"fmt"
 	"learning-web-chatboard2/common"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"strings"
 )
 
+const runeSource = "aA1bB2cC3dD4eE5fFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvV6wW7xX8yY9zZ"
+
+func generate(length uint) (str string, err error) {
+	var i uint
+	maxEx := int64(len(runeSource))
+	runePool := []rune(runeSource)
+	for i = 0; i < length; i++ {
+		bigN, err := rand.Int(rand.Reader, big.NewInt(maxEx))
+		if err != nil {
+			break
+		}
+		n := bigN.Uint64()
+		str = fmt.Sprint(str, string(runePool[n]))
+	}
+	return
+}
+
 func main() {
+	fmt.Println(generate(32))
+}
+
+func doFunc() {
 	c := make(chan bool)
 	go do(c)
 	for {
