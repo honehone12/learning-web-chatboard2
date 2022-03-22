@@ -19,6 +19,11 @@ func main() {
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
+	//processor data
+	err = newProcessor()
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
 	//log
 	logger, err = common.OpenLogger(
 		config.LogToFile,

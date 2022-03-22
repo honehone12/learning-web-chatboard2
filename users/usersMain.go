@@ -42,6 +42,7 @@ func main() {
 	routeEngine.POST("/create-session", createSession)
 	routeEngine.POST("/authenticate", readUser)
 	routeEngine.POST("/check-session", readSession)
+	routeEngine.POST("/update-session", updateSession)
 	routeEngine.POST("/delete-session", deleteSession)
 
 	routeEngine.Run(config.AddressUsers)

@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const runeSource = "aA1bB2cC3dD4eE5fFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvV6wW7xX8yY9zZ"
+const runeSource = "aA1bB2cC3dD4eE5fFgGhHiIjJkKlLm0MnNoOpPqQrRsStTuUvV6wW7xX8yY9zZ"
 
 func generate(length uint) (str string, err error) {
 	var i uint
@@ -29,7 +29,7 @@ func generate(length uint) (str string, err error) {
 }
 
 func main() {
-	fmt.Println(generate(32))
+	fmt.Println(generate(8))
 }
 
 func doFunc() {

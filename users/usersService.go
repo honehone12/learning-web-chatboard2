@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	UserTable    = "users"
-	SessionTable = "sessions"
+	userTable    = "users"
+	sessionTable = "sessions"
 )
 
 func handleErrorInternal(
@@ -20,7 +20,7 @@ func handleErrorInternal(
 	ctx *gin.Context,
 ) {
 	common.LogError(logger).Println(loggerErrorMsg)
-	ctx.String(http.StatusBadRequest, "error")
+	ctx.JSON(http.StatusBadRequest, gin.H{"status": "error"})
 }
 
 // better way to send user data??
@@ -119,6 +119,33 @@ func readSessionInternal(ctx *gin.Context, searchSess *common.Session) (err erro
 	return
 }
 
+func updateSession(ctx *gin.Context) {
+	var sess common.Session
+	err := updateSessionInternal(ctx, &sess)
+	if err != nil {
+		handleErrorInternal(err.Error(), ctx)
+		return
+	}
+	ctx.JSON(http.StatusOK, &sess)
+}
+
+func updateSessionInternal(ctx *gin.Context, sess *common.Session) (err error) {
+	err = ctx.Bind(sess)
+	if err != nil {
+		return
+	}
+	if common.IsEmpty(
+		sess.UuId,
+		sess.UserName,
+		sess.State,
+	) {
+		err = errors.New("contains empty string")
+		return
+	}
+	err = updateSessionSQLInternal(sess)
+	return
+}
+
 func deleteSession(ctx *gin.Context) {
 	var delSess common.Session
 	err := deleteSessionInternal(ctx, &delSess)
@@ -145,7 +172,7 @@ func createUserSQLInternal(newUser *common.User) (err error) {
 	newUser.UuId = common.NewUuIdString()
 	newUser.CreatedAt = time.Now()
 	affected, err := dbEngine.
-		Table(UserTable).
+		Table(userTable).
 		InsertOne(newUser)
 	if err == nil && affected != 1 {
 		err = fmt.Errorf(
@@ -164,7 +191,7 @@ func createSessionSQLInternal(sessUser *common.User) (session *common.Session, e
 		CreatedAt: time.Now(),
 	}
 	affected, err := dbEngine.
-		Table(SessionTable).
+		Table(sessionTable).
 		InsertOne(session)
 	if err == nil && affected != 1 {
 		err = fmt.Errorf(
@@ -178,7 +205,7 @@ func createSessionSQLInternal(sessUser *common.User) (session *common.Session, e
 func readUserSQLInternal(searchUser *common.User) (err error) {
 	var ok bool
 	ok, err = dbEngine.
-		Table(UserTable).
+		Table(userTable).
 		Get(searchUser)
 	if err == nil && !ok {
 		err = errors.New("no such users")
@@ -189,7 +216,7 @@ func readUserSQLInternal(searchUser *common.User) (err error) {
 func readSessionSQLInternal(searchSess *common.Session) (err error) {
 	var ok bool
 	ok, err = dbEngine.
-		Table(SessionTable).
+		Table(sessionTable).
 		Get(searchSess)
 	if err == nil && !ok {
 		err = errors.New("no such session")
@@ -197,9 +224,23 @@ func readSessionSQLInternal(searchSess *common.Session) (err error) {
 	return
 }
 
+func updateSessionSQLInternal(session *common.Session) (err error) {
+	affected, err := dbEngine.
+		Table(sessionTable).
+		ID(session.Id).
+		Update(session)
+	if err == nil && affected != 1 {
+		err = fmt.Errorf(
+			"something wrong. returned value was %d",
+			affected,
+		)
+	}
+	return
+}
+
 func deleteSessionSQLInternal(delSess *common.Session) (err error) {
 	affected, err := dbEngine.
-		Table(SessionTable).
+		Table(sessionTable).
 		Delete(delSess)
 	if err == nil && affected != 1 {
 		err = fmt.Errorf(

@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	ThreadsTable     = "threads"
-	PostsTable       = "posts"
-	DescendingUpdate = "last_update"
+	threadsTable     = "threads"
+	postsTable       = "posts"
+	descendingUpdate = "last_update"
 )
 
 func handleErrorInternal(
@@ -21,7 +21,7 @@ func handleErrorInternal(
 	ctx *gin.Context,
 ) {
 	common.LogError(logger).Println(loggerErrorMsg)
-	ctx.String(http.StatusBadRequest, "error")
+	ctx.JSON(http.StatusBadRequest, gin.H{"status": "error"})
 }
 
 func createThread(ctx *gin.Context) {
@@ -111,7 +111,11 @@ func updateThreadInternal(ctx *gin.Context, thre *common.Thread) (err error) {
 	if err != nil {
 		return
 	}
-	if common.IsEmpty(thre.UuId, thre.Topic, thre.Owner) {
+	if common.IsEmpty(
+		thre.UuId,
+		thre.Topic,
+		thre.Owner,
+	) {
 		err = errors.New("contains empty string")
 		return
 	}
@@ -152,7 +156,7 @@ func createThreadSQLInternal(newThre *common.Thread) (err error) {
 	newThre.CreatedAt = now
 
 	affected, err := dbEngine.
-		Table(ThreadsTable).
+		Table(threadsTable).
 		InsertOne(&newThre)
 	if err == nil && affected != 1 {
 		err = fmt.Errorf(
@@ -168,7 +172,7 @@ func createPostSQLInternal(newPost *common.Post) (err error) {
 	newPost.CreatedAt = time.Now()
 
 	affected, err := dbEngine.
-		Table(PostsTable).
+		Table(postsTable).
 		InsertOne(newPost)
 	if err == nil && affected != 1 {
 		err = fmt.Errorf(
@@ -181,15 +185,15 @@ func createPostSQLInternal(newPost *common.Post) (err error) {
 
 func readThreadsSQLInternal() (threads []common.Thread, err error) {
 	err = dbEngine.
-		Table(ThreadsTable).
-		Desc(DescendingUpdate).
+		Table(threadsTable).
+		Desc(descendingUpdate).
 		Find(&threads)
 	return
 }
 
 func readAThreadSQLInternal(thread *common.Thread) (err error) {
 	ok, err := dbEngine.
-		Table(ThreadsTable).
+		Table(threadsTable).
 		Get(thread)
 	if err == nil && !ok {
 		err = errors.New("no such thread")
@@ -201,7 +205,7 @@ func updateThreadSQLInternal(thread *common.Thread) (err error) {
 	thread.LastUpdate = time.Now()
 
 	affected, err := dbEngine.
-		Table(ThreadsTable).
+		Table(threadsTable).
 		ID(thread.Id).
 		Update(thread)
 	if err == nil && affected != 1 {
@@ -215,7 +219,7 @@ func updateThreadSQLInternal(thread *common.Thread) (err error) {
 
 func readPostsInThreadSQLInternal(thread *common.Thread) (posts []common.Post, err error) {
 	err = dbEngine.
-		Table(PostsTable).
+		Table(postsTable).
 		Where("thread_id = ?", thread.Id).
 		Find(&posts)
 	return

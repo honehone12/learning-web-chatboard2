@@ -10,18 +10,18 @@ import (
 )
 
 const (
-	LoggedIn   = "logged-in"
-	SessionPtr = "session-ptr"
+	loggedInLabel   = "logged-in"
+	sessionPtrLabel = "session-ptr"
 )
 
 func LoggedInCheckerMiddleware(ctx *gin.Context) {
 	err := checkLoggedIn(ctx)
-	ctx.Set(LoggedIn, err == nil)
+	ctx.Set(loggedInLabel, err == nil)
 	ctx.Next()
 }
 
 func checkLoggedIn(ctx *gin.Context) (err error) {
-	uuid, err := ctx.Cookie(ShortTimeSession)
+	uuid, err := pickupSessionCookie(ctx)
 	if err != nil {
 		return
 	}
@@ -33,7 +33,7 @@ func checkLoggedIn(ctx *gin.Context) (err error) {
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressUsers,
 			"/check-session",
 		),
@@ -52,16 +52,16 @@ func checkLoggedIn(ctx *gin.Context) (err error) {
 	if err != nil {
 		return
 	}
-	ctx.Set(SessionPtr, sess)
+	ctx.Set(sessionPtrLabel, sess)
 	return
 }
 
-func ConfirmLoggedIn(ctx *gin.Context) (loggedIn bool) {
-	loggedInVal, ok := ctx.Get(LoggedIn)
+func ConfirmLoggedIn(ctx *gin.Context) (isLoggedIn bool) {
+	loggedInVal, ok := ctx.Get(loggedInLabel)
 	if !ok {
 		common.LogError(logger).Fatalln("middleware not working")
 	}
-	loggedIn, ok = loggedInVal.(bool)
+	isLoggedIn, ok = loggedInVal.(bool)
 	if !ok {
 		common.LogError(logger).Fatalln("middleware not working")
 	}
@@ -69,7 +69,7 @@ func ConfirmLoggedIn(ctx *gin.Context) (loggedIn bool) {
 }
 
 func GetSessionPtr(ctx *gin.Context) (ptr *common.Session, err error) {
-	val, ok := ctx.Get(SessionPtr)
+	val, ok := ctx.Get(sessionPtrLabel)
 	if !ok {
 		common.LogError(logger).Fatalln("middleware not working")
 		err = errors.New("middleware not working")

@@ -52,8 +52,8 @@ const (
 )
 
 const (
-	Http             = "http://"
-	ShortTimeSession = "short-time"
+	httpPrefix       = "http://"
+	shortTimeSession = "short-time"
 )
 
 func handleErrorInternal(
@@ -95,7 +95,7 @@ func indexGetInternal(ctx *gin.Context) (threads []common.Thread, err error) {
 		http.MethodGet,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressThreads,
 			"/read-index",
 		),
@@ -172,14 +172,14 @@ func logoutGet(ctx *gin.Context) {
 }
 
 func logoutGetInternal(ctx *gin.Context) (err error) {
-	uuid, _ := ctx.Cookie(ShortTimeSession)
+	uuid, _ := ctx.Cookie(shortTimeSession)
 	sess := &common.Session{UuId: uuid}
 	req, err := common.MakeRequestFromSession(
 		sess,
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressUsers,
 			"/delete-session",
 		),
@@ -215,7 +215,7 @@ func signupPostInternal(ctx *gin.Context) (err error) {
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressUsers,
 			"/signup-account",
 		),
@@ -248,7 +248,7 @@ func authenticatePostInternal(ctx *gin.Context) (err error) {
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressUsers,
 			"/authenticate",
 		),
@@ -278,7 +278,7 @@ func authenticatePostInternal(ctx *gin.Context) (err error) {
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressUsers,
 			"/create-session",
 		),
@@ -298,18 +298,8 @@ func authenticatePostInternal(ctx *gin.Context) (err error) {
 		return
 	}
 
-	/////////////////////////////////////////////
-	//session cookie
-	ctx.SetSameSite(http.SameSiteStrictMode)
-	ctx.SetCookie(
-		ShortTimeSession,
-		session.UuId,
-		0,
-		"/",
-		"localhost",
-		true,
-		true,
-	)
+	// session starts here
+	err = storeSessionCookie(ctx, session.UuId)
 	return
 }
 
@@ -320,6 +310,13 @@ func threadGet(ctx *gin.Context) {
 		return
 	}
 	navbar, reply := getHTMLElemntInternal(ConfirmLoggedIn(ctx))
+	/////////////////////////////////////////////////////////
+	// set state
+	state, err := generateState(ctx)
+	if err != nil {
+		handleErrorInternal(err.Error(), ctx, "failed to read thread")
+		return
+	}
 	ctx.HTML(
 		http.StatusOK,
 		"thread.html",
@@ -328,7 +325,7 @@ func threadGet(ctx *gin.Context) {
 			"thread": thre,
 			"reply":  reply,
 			"posts":  posts,
-			"token":  "easy-token",
+			"state":  state,
 		},
 	)
 }
@@ -341,7 +338,7 @@ func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressThreads,
 			"/read",
 		),
@@ -366,7 +363,7 @@ func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressThreads,
 			"/read-posts",
 		),
@@ -437,7 +434,7 @@ func newThreadPostInternal(ctx *gin.Context) (err error) {
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressThreads,
 			"/create",
 		),
@@ -503,7 +500,7 @@ func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressThreads,
 			"/create-post",
 		),
@@ -525,7 +522,7 @@ func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressThreads,
 			"/read",
 		),
@@ -551,7 +548,7 @@ func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
 		http.MethodPost,
 		fmt.Sprintf(
 			"%s%s%s",
-			Http,
+			httpPrefix,
 			config.AddressThreads,
 			"/update",
 		),
