@@ -8,5 +8,5 @@ refering to https://github.com/mushahiroyuki/gowebprog<br>
 <li>update session exp</li>
 <li>use state every input form</li>
 <li>how to remember which-thread-to-write in secure?(cookie? hiddden form?)</li>
-<li>getAll**() methods returns a slice. not suitable for messaging.</li>
+<li>get methods returns everything in db.</li>
 </ul>
