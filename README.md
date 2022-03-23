@@ -4,8 +4,9 @@ refering to https://github.com/mushahiroyuki/gowebprog<br>
 <br>
 <h1>todo:</h1>
 <ul>
-<li>use more useful http status</li>
 <li>currently view is broken</li>
-<li>currently username is not unique.</li>
+<li>update session exp</li>
+<li>use state every input form</li>
+<li>how to remember which-thread-to-write in secure?(cookie? hiddden form?)</li>
 <li>getAll**() methods returns a slice. not suitable for messaging.</li>
 </ul>

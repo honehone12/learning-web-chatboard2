@@ -47,6 +47,8 @@ func createUserInternal(ctx *gin.Context, newUser *common.User) (err error) {
 		err = errors.New("contains empty string")
 		return
 	}
+	newUser.UuId = common.NewUuIdString()
+	newUser.CreatedAt = time.Now()
 	err = createUserSQLInternal(newUser)
 	return
 }
@@ -70,7 +72,15 @@ func createSessionInternal(ctx *gin.Context, sessUser *common.User) (sess *commo
 		err = errors.New("contains empty string")
 		return
 	}
-	sess, err = createSessionSQLInternal(sessUser)
+	now := time.Now()
+	sess = &common.Session{
+		UuId:       common.NewUuIdString(),
+		UserName:   sessUser.Name,
+		UserId:     sessUser.Id,
+		LastUpdate: now,
+		CreatedAt:  now,
+	}
+	err = createSessionSQLInternal(sess)
 	return
 }
 
@@ -102,6 +112,7 @@ func readSession(ctx *gin.Context) {
 	err := readSessionInternal(ctx, &searchSess)
 	if err != nil {
 		handleErrorInternal(err.Error(), ctx)
+		return
 	}
 	ctx.JSON(http.StatusOK, &searchSess)
 }
@@ -142,6 +153,7 @@ func updateSessionInternal(ctx *gin.Context, sess *common.Session) (err error) {
 		err = errors.New("contains empty string")
 		return
 	}
+	sess.LastUpdate = time.Now()
 	err = updateSessionSQLInternal(sess)
 	return
 }
@@ -169,8 +181,6 @@ func deleteSessionInternal(ctx *gin.Context, delSess *common.Session) (err error
 }
 
 func createUserSQLInternal(newUser *common.User) (err error) {
-	newUser.UuId = common.NewUuIdString()
-	newUser.CreatedAt = time.Now()
 	affected, err := dbEngine.
 		Table(userTable).
 		InsertOne(newUser)
@@ -183,13 +193,7 @@ func createUserSQLInternal(newUser *common.User) (err error) {
 	return
 }
 
-func createSessionSQLInternal(sessUser *common.User) (session *common.Session, err error) {
-	session = &common.Session{
-		UuId:      common.NewUuIdString(),
-		UserName:  sessUser.Name,
-		UserId:    sessUser.Id,
-		CreatedAt: time.Now(),
-	}
+func createSessionSQLInternal(session *common.Session) (err error) {
 	affected, err := dbEngine.
 		Table(sessionTable).
 		InsertOne(session)

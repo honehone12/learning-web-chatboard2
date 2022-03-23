@@ -79,7 +79,7 @@ func indexGet(ctx *gin.Context) {
 		handleErrorInternal(err.Error(), ctx, "failed to read thread")
 		return
 	}
-	navbar, _ := getHTMLElemntInternal(ConfirmLoggedIn(ctx))
+	navbar, _ := getHTMLElemntInternal(confirmLoggedIn(ctx))
 	ctx.HTML(
 		http.StatusOK,
 		"index.html",
@@ -93,12 +93,7 @@ func indexGet(ctx *gin.Context) {
 func indexGetInternal(ctx *gin.Context) (threads []common.Thread, err error) {
 	req, err := http.NewRequest(
 		http.MethodGet,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressThreads,
-			"/read-index",
-		),
+		buildHTTP_URL(config.AddressThreads, "/read-index"),
 		nil,
 	)
 	if err != nil {
@@ -133,7 +128,7 @@ func errorRedirect(ctx *gin.Context, msg string) {
 
 func errorGet(ctx *gin.Context) {
 	errMsg := ctx.Query("msg")
-	navbar, _ := getHTMLElemntInternal(ConfirmLoggedIn(ctx))
+	navbar, _ := getHTMLElemntInternal(confirmLoggedIn(ctx))
 	ctx.HTML(
 		http.StatusOK,
 		"error.html",
@@ -161,7 +156,7 @@ func signupGet(ctx *gin.Context) {
 }
 
 func logoutGet(ctx *gin.Context) {
-	if ConfirmLoggedIn(ctx) {
+	if confirmLoggedIn(ctx) {
 		err := logoutGetInternal(ctx)
 		if err != nil {
 			handleErrorInternal(err.Error(), ctx, "failed to logout")
@@ -172,17 +167,14 @@ func logoutGet(ctx *gin.Context) {
 }
 
 func logoutGetInternal(ctx *gin.Context) (err error) {
-	uuid, _ := ctx.Cookie(shortTimeSession)
-	sess := &common.Session{UuId: uuid}
+	sess, err := getSessionPtr(ctx)
+	if err != nil {
+		return
+	}
 	req, err := common.MakeRequestFromSession(
 		sess,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressUsers,
-			"/delete-session",
-		),
+		buildHTTP_URL(config.AddressUsers, "/delete-session"),
 	)
 	if err != nil {
 		return
@@ -213,12 +205,7 @@ func signupPostInternal(ctx *gin.Context) (err error) {
 	req, err := common.MakeRequestFromUser(
 		&newUser,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressUsers,
-			"/signup-account",
-		),
+		buildHTTP_URL(config.AddressUsers, "/signup-account"),
 	)
 	if err != nil {
 		return
@@ -246,12 +233,7 @@ func authenticatePostInternal(ctx *gin.Context) (err error) {
 	req, err := common.MakeRequestFromUser(
 		&authUser,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressUsers,
-			"/authenticate",
-		),
+		buildHTTP_URL(config.AddressUsers, "/authenticate"),
 	)
 	if err != nil {
 		return
@@ -276,12 +258,7 @@ func authenticatePostInternal(ctx *gin.Context) (err error) {
 	req, err = common.MakeRequestFromUser(
 		authedUser,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressUsers,
-			"/create-session",
-		),
+		buildHTTP_URL(config.AddressUsers, "/create-session"),
 	)
 	if err != nil {
 		return
@@ -309,14 +286,18 @@ func threadGet(ctx *gin.Context) {
 		handleErrorInternal(err.Error(), ctx, "failed to read thread")
 		return
 	}
-	navbar, reply := getHTMLElemntInternal(ConfirmLoggedIn(ctx))
-	/////////////////////////////////////////////////////////
+
+	navbar, reply := getHTMLElemntInternal(confirmLoggedIn(ctx))
 	// set state
-	state, err := generateState(ctx)
-	if err != nil {
-		handleErrorInternal(err.Error(), ctx, "failed to read thread")
-		return
+	var state string
+	if confirmLoggedIn(ctx) {
+		state, err = generateState(ctx)
+		if err != nil {
+			handleErrorInternal(err.Error(), ctx, "failed to read thread")
+			return
+		}
 	}
+
 	ctx.HTML(
 		http.StatusOK,
 		"thread.html",
@@ -336,12 +317,7 @@ func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.
 	req, err := common.MakeRequestFromThread(
 		&thre,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressThreads,
-			"/read",
-		),
+		buildHTTP_URL(config.AddressThreads, "/read"),
 	)
 	if err != nil {
 		return
@@ -361,12 +337,7 @@ func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.
 	req, err = common.MakeRequestFromThread(
 		thread,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressThreads,
-			"/read-posts",
-		),
+		buildHTTP_URL(config.AddressThreads, "/read-posts"),
 	)
 	if err != nil {
 		return
@@ -388,7 +359,7 @@ func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.
 }
 
 func newThreadGet(ctx *gin.Context) {
-	loggedin := ConfirmLoggedIn(ctx)
+	loggedin := confirmLoggedIn(ctx)
 	navbar, _ := getHTMLElemntInternal(loggedin)
 	if loggedin {
 		ctx.HTML(
@@ -404,7 +375,7 @@ func newThreadGet(ctx *gin.Context) {
 }
 
 func newThreadPost(ctx *gin.Context) {
-	if !ConfirmLoggedIn(ctx) {
+	if !confirmLoggedIn(ctx) {
 		ctx.Redirect(http.StatusFound, "/user/login")
 		return
 	}
@@ -419,7 +390,7 @@ func newThreadPost(ctx *gin.Context) {
 }
 
 func newThreadPostInternal(ctx *gin.Context) (err error) {
-	sess, err := GetSessionPtr(ctx)
+	sess, err := getSessionPtr(ctx)
 	if err != nil {
 		return
 	}
@@ -432,12 +403,7 @@ func newThreadPostInternal(ctx *gin.Context) (err error) {
 	req, err := common.MakeRequestFromThread(
 		&thre,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressThreads,
-			"/create",
-		),
+		buildHTTP_URL(config.AddressThreads, "/create"),
 	)
 	if err != nil {
 		return
@@ -450,7 +416,7 @@ func newThreadPostInternal(ctx *gin.Context) (err error) {
 }
 
 func newReplyPost(ctx *gin.Context) {
-	if !ConfirmLoggedIn(ctx) {
+	if !confirmLoggedIn(ctx) {
 		ctx.Redirect(http.StatusFound, "/user/login")
 		return
 	}
@@ -464,30 +430,24 @@ func newReplyPost(ctx *gin.Context) {
 }
 
 func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
-	////////////////////////////////////////////////
-	// token must be changed everytime and
-	// we have to remember token.
-	token := ctx.PostForm("token")
-	if strings.Compare(token, "easy-token") != 0 {
-		ctx.Abort()
-		return
-	}
-
-	sess, err := GetSessionPtr(ctx)
+	sess, err := getSessionPtr(ctx)
 	if err != nil {
 		return
 	}
 
-	body := ctx.PostForm("body")
-	/////////////////////////////////////////
-	// here means uuid and id are now public info
-	// should be encrypted
-	// or use (session) cookie
-	threUuId = ctx.PostForm("uuid")
+	// check state
+	state := ctx.PostForm("state")
+	err = checkState(state, sess)
+	if err != nil {
+		return
+	}
+
 	threId, err := strconv.Atoi(ctx.PostForm("id"))
 	if err != nil {
 		return
 	}
+	body := ctx.PostForm("body")
+	threUuId = ctx.PostForm("uuid")
 
 	post := common.Post{
 		Body:        body,
@@ -498,12 +458,7 @@ func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
 	req, err := common.MakeRequestFromPost(
 		&post,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressThreads,
-			"/create-post",
-		),
+		buildHTTP_URL(config.AddressThreads, "/create-post"),
 	)
 	if err != nil {
 		return
@@ -520,12 +475,7 @@ func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
 	req, err = common.MakeRequestFromThread(
 		&thre,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressThreads,
-			"/read",
-		),
+		buildHTTP_URL(config.AddressThreads, "/read"),
 	)
 	if err != nil {
 		return
@@ -546,12 +496,7 @@ func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
 	req, err = common.MakeRequestFromThread(
 		threPtr,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressThreads,
-			"/update",
-		),
+		buildHTTP_URL(config.AddressThreads, "/update"),
 	)
 	if err != nil {
 		return

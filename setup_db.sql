@@ -18,6 +18,7 @@ CREATE TABLE sessions (
   user_name  VARCHAR(255),
   user_id    SERIAL REFERENCES users(id),
   state      TEXT,
+  last_update TIMESTAMP NOT NULL,
   created_at TIMESTAMP NOT NULL   
 );
 

@@ -43,6 +43,10 @@ func createThreadInternal(ctx *gin.Context, newThre *common.Thread) (err error) 
 		err = errors.New("contains empty string")
 		return
 	}
+	now := time.Now()
+	newThre.UuId = common.NewUuIdString()
+	newThre.LastUpdate = now
+	newThre.CreatedAt = now
 	err = createThreadSQLInternal(newThre)
 	return
 }
@@ -69,6 +73,8 @@ func createPostInternal(ctx *gin.Context, post *common.Post) (err error) {
 		err = errors.New("contains empty string")
 		return
 	}
+	post.UuId = common.NewUuIdString()
+	post.CreatedAt = time.Now()
 	err = createPostSQLInternal(post)
 	return
 }
@@ -119,6 +125,7 @@ func updateThreadInternal(ctx *gin.Context, thre *common.Thread) (err error) {
 		err = errors.New("contains empty string")
 		return
 	}
+	thre.LastUpdate = time.Now()
 	err = updateThreadSQLInternal(thre)
 	return
 }
@@ -150,11 +157,6 @@ func readThreads(ctx *gin.Context) {
 }
 
 func createThreadSQLInternal(newThre *common.Thread) (err error) {
-	now := time.Now()
-	newThre.UuId = common.NewUuIdString()
-	newThre.LastUpdate = now
-	newThre.CreatedAt = now
-
 	affected, err := dbEngine.
 		Table(threadsTable).
 		InsertOne(&newThre)
@@ -168,9 +170,6 @@ func createThreadSQLInternal(newThre *common.Thread) (err error) {
 }
 
 func createPostSQLInternal(newPost *common.Post) (err error) {
-	newPost.UuId = common.NewUuIdString()
-	newPost.CreatedAt = time.Now()
-
 	affected, err := dbEngine.
 		Table(postsTable).
 		InsertOne(newPost)
@@ -202,8 +201,6 @@ func readAThreadSQLInternal(thread *common.Thread) (err error) {
 }
 
 func updateThreadSQLInternal(thread *common.Thread) (err error) {
-	thread.LastUpdate = time.Now()
-
 	affected, err := dbEngine.
 		Table(threadsTable).
 		ID(thread.Id).

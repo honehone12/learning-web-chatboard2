@@ -35,16 +35,16 @@ func main() {
 
 	//gin
 	webEngine := gin.Default()
-	webEngine.Use(LoggedInCheckerMiddleware)
 	// setup templates
 	webEngine.Static("/static", "./public")
 	webEngine.Delims("{{", "}}")
 	webEngine.LoadHTMLGlob("./templates/*")
 	//setup routes
-	webEngine.GET("/", indexGet)
-	webEngine.GET("/error", errorGet)
+	webEngine.GET("/", LoggedInCheckerMiddleware, indexGet)
+	webEngine.GET("/error", LoggedInCheckerMiddleware, errorGet)
 
 	usersRoute := webEngine.Group("/user")
+	usersRoute.Use(LoggedInCheckerMiddleware)
 	usersRoute.GET("/login", loginGet)
 	usersRoute.GET("/signup", signupGet)
 	usersRoute.GET("logout", logoutGet)
@@ -52,6 +52,7 @@ func main() {
 	usersRoute.POST("/authenticate", authenticatePost)
 
 	threadsRoute := webEngine.Group("/thread")
+	threadsRoute.Use(LoggedInCheckerMiddleware)
 	threadsRoute.GET("/read", threadGet)
 	threadsRoute.GET("/new", newThreadGet)
 	threadsRoute.POST("/create", newThreadPost)

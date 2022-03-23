@@ -11,8 +11,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"learning-web-chatboard2/common"
 	"math/big"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,9 +27,11 @@ const (
 	pwSalt     = "LV2vP8vq"
 )
 const (
-	aes256KeySize uint = 32
-	macKeySize    uint = 32
-	stateSize     uint = 32
+	aes256KeySize uint          = 32
+	macKeySize    uint          = 32
+	stateSize     uint          = 32
+	sessionExp    time.Duration = time.Hour
+	stateExp      time.Duration = time.Minute * 10
 )
 
 var helper struct {
@@ -46,6 +52,16 @@ func newProcessor() (err error) {
 	}
 	helper.macKey = []byte(macKeyStr)
 	helper.block, err = aes.NewCipher(bKey)
+	return
+}
+
+func buildHTTP_URL(domain string, path string) (url string) {
+	url = fmt.Sprintf(
+		"%s%s%s",
+		httpPrefix,
+		domain,
+		path,
+	)
 	return
 }
 
@@ -121,6 +137,12 @@ func decode(encoded string) ([]byte, error) {
 }
 
 func storeSessionCookie(ctx *gin.Context, value string) (err error) {
+	//add exp 1h
+	value = fmt.Sprintf(
+		"%s|%d",
+		value,
+		time.Now().Add(time.Duration(sessionExp)).Unix(),
+	)
 	encrypted, err := encrypt(value)
 	if err != nil {
 		return
@@ -163,18 +185,105 @@ func pickupSessionCookie(ctx *gin.Context) (uuid string, err error) {
 		err = errors.New("invalid cookie")
 		return
 	}
-	uuid, err = decrypt(encrypted)
-	return
-}
-
-// this should be middleware!!
-func generateState(ctx *gin.Context) (state string, err error) {
-	state, err = generateString(stateSize)
-	sess, err := GetSessionPtr(ctx)
+	decrypted, err := decrypt(encrypted)
 	if err != nil {
 		return
 	}
-	sess.State = state
+	uuid, unixTimeStr, ok := strings.Cut(decrypted, "|")
+	if !ok {
+		err = errors.New("separator not found")
+		return
+	}
+	unixTime, err := strconv.ParseInt(unixTimeStr, 10, 64)
+	if err != nil {
+		return
+	}
+	////////////////////////////////////////////////
+	// exp should be updated!!
+	if unixTime < time.Now().Unix() {
+		err = errors.New("session expired")
+	}
+	return
+}
 
+func generateState(ctx *gin.Context) (stateAndMAC string, err error) {
+	sess, err := getSessionPtr(ctx)
+	if err != nil {
+		return
+	}
+	state, err := generateString(stateSize)
+	if err != nil {
+		return
+	}
+	state = fmt.Sprintf(
+		"%s|%d",
+		state,
+		time.Now().Add(time.Duration(stateExp)).Unix(),
+	) // 10m later
+	sess.State = state
+	err = requestSessionUpdate(sess)
+	if err != nil {
+		return
+	}
+	ctx.Set(sessionPtrLabel, sess)
+
+	// same proc with cookie
+	stateAsBytes := []byte(state)
+	bytesVal := makeMAC(stateAsBytes)
+	bytesVal = append(bytesVal, []byte("|")...)
+	bytesVal = append(bytesVal, stateAsBytes...)
+	stateAndMAC = encode(bytesVal)
+	return
+}
+
+func requestSessionUpdate(sess *common.Session) (err error) {
+	req, err := common.MakeRequestFromSession(
+		sess,
+		http.MethodPost,
+		buildHTTP_URL(config.AddressUsers, "/update-session"),
+	)
+	if err != nil {
+		return
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return
+	} else if res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
+		return
+	}
+	sess, err = common.MakeSessionFromResponse(res)
+	return
+}
+
+func checkState(storedVal string, sess *common.Session) (err error) {
+	bytesVal, err := decode(storedVal)
+	if err != nil {
+		return
+	}
+	splited := bytes.SplitN(bytesVal, []byte("|"), 2)
+	macStored := splited[0]
+	stateStored := string(splited[1])
+
+	if !verifyMAC(macStored, []byte(sess.State)) {
+		err = errors.New("invalid mac")
+		return
+	}
+	if strings.Compare(stateStored, sess.State) != 0 {
+		err = errors.New("invalid state")
+		return
+	}
+	_, unixTimeStr, ok := strings.Cut(stateStored, "|")
+	if !ok {
+		err = errors.New("separator not found")
+		return
+	}
+	unixTime, err := strconv.ParseInt(unixTimeStr, 10, 64)
+	if err != nil {
+		return
+	}
+	if unixTime < time.Now().Unix() {
+		err = errors.New("state expired")
+	}
 	return
 }

@@ -14,12 +14,13 @@ type User struct {
 }
 
 type Session struct {
-	Id        uint      `xorm:"pk autoincr 'id'" json:"id"`
-	UuId      string    `xorm:"not null unique 'uu_id'" json:"uuid"`
-	UserName  string    `xorm:"user_name" json:"user_name"`
-	UserId    uint      `xorm:"user_id" json:"user_id"`
-	State     string    `xorm:"TEXT 'state'" json:"state"`
-	CreatedAt time.Time `xorm:"not null 'created_at'" json:"created_at"`
+	Id         uint      `xorm:"pk autoincr 'id'" json:"id"`
+	UuId       string    `xorm:"not null unique 'uu_id'" json:"uuid"`
+	UserName   string    `xorm:"user_name" json:"user_name"`
+	UserId     uint      `xorm:"user_id" json:"user_id"`
+	State      string    `xorm:"TEXT 'state'" json:"state"`
+	LastUpdate time.Time `xorm:"not null 'last_update'" json:"last_update"`
+	CreatedAt  time.Time `xorm:"not null 'created_at'" json:"created_at"`
 }
 
 type Thread struct {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"learning-web-chatboard2/common"
 	"net/http"
 
@@ -16,6 +15,9 @@ const (
 
 func LoggedInCheckerMiddleware(ctx *gin.Context) {
 	err := checkLoggedIn(ctx)
+	if err != nil {
+		common.LogWarning(logger).Println(err.Error())
+	}
 	ctx.Set(loggedInLabel, err == nil)
 	ctx.Next()
 }
@@ -25,18 +27,13 @@ func checkLoggedIn(ctx *gin.Context) (err error) {
 	if err != nil {
 		return
 	}
-	sess := &common.Session{
+	sess := common.Session{
 		UuId: uuid,
 	}
 	req, err := common.MakeRequestFromSession(
-		sess,
+		&sess,
 		http.MethodPost,
-		fmt.Sprintf(
-			"%s%s%s",
-			httpPrefix,
-			config.AddressUsers,
-			"/check-session",
-		),
+		buildHTTP_URL(config.AddressUsers, "/check-session"),
 	)
 	if err != nil {
 		return
@@ -48,18 +45,25 @@ func checkLoggedIn(ctx *gin.Context) (err error) {
 		err = errors.New(res.Status)
 		return
 	}
-	sess, err = common.MakeSessionFromResponse(res)
+	sessPtr, err := common.MakeSessionFromResponse(res)
 	if err != nil {
 		return
 	}
-	ctx.Set(sessionPtrLabel, sess)
+	// update session
+
+	// if time.Since(sessPtr.LastUpdate) > time.Second*1 {
+	// 	storeSessionCookie(ctx, sess.UuId)
+	// 	requestSessionUpdate(sessPtr)
+	// }
+	ctx.Set(sessionPtrLabel, sessPtr)
 	return
 }
 
-func ConfirmLoggedIn(ctx *gin.Context) (isLoggedIn bool) {
+func confirmLoggedIn(ctx *gin.Context) (isLoggedIn bool) {
 	loggedInVal, ok := ctx.Get(loggedInLabel)
 	if !ok {
 		common.LogError(logger).Fatalln("middleware not working")
+		return
 	}
 	isLoggedIn, ok = loggedInVal.(bool)
 	if !ok {
@@ -68,11 +72,11 @@ func ConfirmLoggedIn(ctx *gin.Context) (isLoggedIn bool) {
 	return
 }
 
-func GetSessionPtr(ctx *gin.Context) (ptr *common.Session, err error) {
+func getSessionPtr(ctx *gin.Context) (ptr *common.Session, err error) {
 	val, ok := ctx.Get(sessionPtrLabel)
 	if !ok {
-		common.LogError(logger).Fatalln("middleware not working")
-		err = errors.New("middleware not working")
+		err = errors.New("not logged in")
+		return
 	}
 	if ptr, ok = val.(*common.Session); !ok {
 		common.LogError(logger).Fatalln("middleware not working")
