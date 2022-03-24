@@ -22,6 +22,7 @@
           </i>
         </h2>
         <div class="lead">Sign up for an account below</div>
+        <input type="hidden" name="state" value="{{ .state }}">
         <input id="name" type="text" name="name" class="form-control" placeholder="Name" required autofocus>
         <input type="email" name="email" class="form-control" placeholder="Email address" required>
         <input type="password" name="password" class="form-control" placeholder="Password" required>

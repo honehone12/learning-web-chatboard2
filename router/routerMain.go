@@ -40,21 +40,45 @@ func main() {
 	webEngine.Delims("{{", "}}")
 	webEngine.LoadHTMLGlob("./templates/*")
 	//setup routes
-	webEngine.GET("/", LoggedInCheckerMiddleware, indexGet)
-	webEngine.GET("/error", LoggedInCheckerMiddleware, errorGet)
+	webEngine.GET(
+		"/",
+		VisitCheckMiddleware, LoggedInCheckerMiddleware,
+		indexGet,
+	)
+	webEngine.GET(
+		"/error",
+		VisitCheckMiddleware, LoggedInCheckerMiddleware,
+		errorGet,
+	)
 
 	usersRoute := webEngine.Group("/user")
-	usersRoute.Use(LoggedInCheckerMiddleware)
-	usersRoute.GET("/login", loginGet)
-	usersRoute.GET("/signup", signupGet)
+	usersRoute.Use(VisitCheckMiddleware, LoggedInCheckerMiddleware)
+	usersRoute.GET(
+		"/login",
+		GenerateVisitStateMiddleware,
+		loginGet,
+	)
+	usersRoute.GET(
+		"/signup",
+		GenerateVisitStateMiddleware,
+		signupGet,
+	)
 	usersRoute.GET("logout", logoutGet)
 	usersRoute.POST("/signup-account", signupPost)
 	usersRoute.POST("/authenticate", authenticatePost)
 
 	threadsRoute := webEngine.Group("/thread")
-	threadsRoute.Use(LoggedInCheckerMiddleware)
-	threadsRoute.GET("/read", threadGet)
-	threadsRoute.GET("/new", newThreadGet)
+	threadsRoute.Use(VisitCheckMiddleware, LoggedInCheckerMiddleware)
+	threadsRoute.GET(
+		"/read",
+		GenerateSessionStateMiddleware,
+		threadGet,
+	)
+	threadsRoute.GET(
+		"/new",
+		GenerateSessionStateMiddleware,
+		newThreadGet,
+	)
 	threadsRoute.POST("/create", newThreadPost)
 	threadsRoute.POST("/post", newReplyPost)
 

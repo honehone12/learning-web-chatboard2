@@ -22,9 +22,11 @@ import (
 )
 
 const (
-	runeSource = "aA1bB2cC3dD4eE5fFgGhHiIjJkKlLm0MnNoOpPqQrRsStTuUvV6wW7xX8yY9zZ"
-	macSalt    = "uPUqL7dZ"
-	pwSalt     = "LV2vP8vq"
+	runeSource         = "aA1bB2cC3dD4eE5fFgGhHiIjJkKlLm0MnNoOpPqQrRsStTuUvV6wW7xX8yY9zZ"
+	macSalt            = "uPUqL7dZ"
+	pwSalt             = "LV2vP8vq"
+	sessionCookieLabel = "short-time"
+	visitCookieLabel   = "long-time"
 )
 const (
 	aes256KeySize uint          = 32
@@ -32,6 +34,7 @@ const (
 	stateSize     uint          = 32
 	sessionExp    time.Duration = time.Hour
 	stateExp      time.Duration = time.Minute * 10
+	visitorExp    time.Duration = time.Hour * 24 * 365
 )
 
 var helper struct {
@@ -136,12 +139,103 @@ func decode(encoded string) ([]byte, error) {
 	return base64.URLEncoding.DecodeString(encoded)
 }
 
+func checkLoggedIn(ctx *gin.Context) (err error) {
+	uuid, err := pickupCookie(ctx, sessionCookieLabel)
+	if err != nil {
+		return
+	}
+	sess := common.Session{
+		UuId: uuid,
+	}
+	req, err := common.MakeRequestFromSession(
+		&sess,
+		http.MethodPost,
+		buildHTTP_URL(config.AddressUsers, "/check-session"),
+	)
+	if err != nil {
+		return
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return
+	} else if res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
+		return
+	}
+	sessPtr, err := common.MakeSessionFromResponse(res)
+	if err != nil {
+		return
+	}
+
+	////////////////////////////////////////////////////////////
+	// update session here??
+	// if time.Since(sessPtr.LastUpdate) > time.Second*1 {
+	// 	storeSessionCookie(ctx, sess.UuId)
+	// 	requestSessionUpdate(sessPtr)
+	// }
+
+	ctx.Set(sessionPtrLabel, sessPtr)
+	return
+}
+
+func visitCheck(ctx *gin.Context) (err error) {
+	var vis *common.Visit
+	_, err = pickupCookie(ctx, visitCookieLabel)
+	if err != nil {
+		vis, err = requestVisitCreate()
+		if err != nil {
+			return
+		}
+	} else {
+		vis, err = requestVisitPtr(ctx)
+		if err != nil {
+			vis, err = requestVisitCreate()
+			if err != nil {
+				return
+			}
+		}
+
+	}
+	ctx.Set(visitPtrLabel, vis)
+	storeVisitCookie(ctx, vis.UuId)
+	err = nil
+	return
+}
+
 func storeSessionCookie(ctx *gin.Context, value string) (err error) {
+	err = storeCookie(
+		ctx,
+		value,
+		sessionCookieLabel,
+		sessionExp,
+		0,
+	)
+	return
+}
+
+func storeVisitCookie(ctx *gin.Context, value string) (err error) {
+	err = storeCookie(
+		ctx,
+		value,
+		visitCookieLabel,
+		visitorExp,
+		60*60*24*365,
+	)
+	return
+}
+
+func storeCookie(
+	ctx *gin.Context,
+	value string,
+	cookieName string,
+	sessionDuration time.Duration,
+	cookieDuration int,
+) (err error) {
 	//add exp 1h
 	value = fmt.Sprintf(
 		"%s|%d",
 		value,
-		time.Now().Add(time.Duration(sessionExp)).Unix(),
+		time.Now().Add(sessionDuration).Unix(),
 	)
 	encrypted, err := encrypt(value)
 	if err != nil {
@@ -158,9 +252,9 @@ func storeSessionCookie(ctx *gin.Context, value string) (err error) {
 
 	ctx.SetSameSite(http.SameSiteStrictMode)
 	ctx.SetCookie(
-		shortTimeSession,
+		cookieName,
 		valToStore,
-		0,
+		cookieDuration,
 		"/",
 		"localhost",
 		true,
@@ -169,8 +263,8 @@ func storeSessionCookie(ctx *gin.Context, value string) (err error) {
 	return
 }
 
-func pickupSessionCookie(ctx *gin.Context) (uuid string, err error) {
-	rawStored, err := ctx.Cookie(shortTimeSession)
+func pickupCookie(ctx *gin.Context, name string) (value string, err error) {
+	rawStored, err := ctx.Cookie(name)
 	if err != nil {
 		return
 	}
@@ -189,7 +283,7 @@ func pickupSessionCookie(ctx *gin.Context) (uuid string, err error) {
 	if err != nil {
 		return
 	}
-	uuid, unixTimeStr, ok := strings.Cut(decrypted, "|")
+	value, unixTimeStr, ok := strings.Cut(decrypted, "|")
 	if !ok {
 		err = errors.New("separator not found")
 		return
@@ -198,19 +292,53 @@ func pickupSessionCookie(ctx *gin.Context) (uuid string, err error) {
 	if err != nil {
 		return
 	}
+
 	////////////////////////////////////////////////
-	// exp should be updated!!
+	// exp should be updated here ??
+	//
 	if unixTime < time.Now().Unix() {
 		err = errors.New("session expired")
 	}
 	return
 }
 
-func generateState(ctx *gin.Context) (stateAndMAC string, err error) {
-	sess, err := getSessionPtr(ctx)
+func generateVisitState(ctx *gin.Context) (stateAndMACEncoded string, err error) {
+	vis, err := requestVisitPtr(ctx)
 	if err != nil {
 		return
 	}
+
+	vis.State, stateAndMACEncoded, err = generateState()
+	if err != nil {
+		return
+	}
+	err = requestVisitUpdate(vis)
+	if err != nil {
+		return
+	}
+	ctx.Set(visitPtrLabel, vis)
+	return
+}
+
+func generateSessionState(ctx *gin.Context) (stateAndMACEncoded string, err error) {
+	sess, err := getSessionPtrFromCTX(ctx)
+	if err != nil {
+		return
+	}
+
+	sess.State, stateAndMACEncoded, err = generateState()
+	if err != nil {
+		return
+	}
+	err = requestSessionUpdate(sess)
+	if err != nil {
+		return
+	}
+	ctx.Set(sessionPtrLabel, sess)
+	return
+}
+
+func generateState() (stateRaw, stateAndMACEncoded string, err error) {
 	state, err := generateString(stateSize)
 	if err != nil {
 		return
@@ -218,21 +346,16 @@ func generateState(ctx *gin.Context) (stateAndMAC string, err error) {
 	state = fmt.Sprintf(
 		"%s|%d",
 		state,
-		time.Now().Add(time.Duration(stateExp)).Unix(),
+		time.Now().Add(stateExp).Unix(),
 	) // 10m later
-	sess.State = state
-	err = requestSessionUpdate(sess)
-	if err != nil {
-		return
-	}
-	ctx.Set(sessionPtrLabel, sess)
+	stateRaw = state
 
 	// same proc with cookie
 	stateAsBytes := []byte(state)
 	bytesVal := makeMAC(stateAsBytes)
 	bytesVal = append(bytesVal, []byte("|")...)
 	bytesVal = append(bytesVal, stateAsBytes...)
-	stateAndMAC = encode(bytesVal)
+	stateAndMACEncoded = encode(bytesVal)
 	return
 }
 
@@ -256,8 +379,80 @@ func requestSessionUpdate(sess *common.Session) (err error) {
 	return
 }
 
-func checkState(storedVal string, sess *common.Session) (err error) {
-	bytesVal, err := decode(storedVal)
+func requestVisitCreate() (vis *common.Visit, err error) {
+	req, err := http.NewRequest(
+		http.MethodGet,
+		buildHTTP_URL(config.AddressUsers, "/create-visit"),
+		nil,
+	)
+	if err != nil {
+		return
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return
+	} else if res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
+		return
+	}
+	vis, err = common.MakeVisitFromResponse(res)
+	return
+}
+
+func requestVisitPtr(ctx *gin.Context) (ptr *common.Visit, err error) {
+	uuid, err := pickupCookie(ctx, visitCookieLabel)
+	if err != nil {
+		return
+	}
+	vis := common.Visit{UuId: uuid}
+	req, err := common.MakeRequestFromVisit(
+		&vis,
+		http.MethodPost,
+		buildHTTP_URL(config.AddressUsers, "/check-visit"),
+	)
+	if err != nil {
+		return
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return
+	} else if res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
+		return
+	}
+	ptr, err = common.MakeVisitFromResponse(res)
+	return
+}
+
+func requestVisitUpdate(vis *common.Visit) (err error) {
+	req, err := common.MakeRequestFromVisit(
+		vis,
+		http.MethodPost,
+		buildHTTP_URL(config.AddressUsers, "/update-visit"),
+	)
+	if err != nil {
+		return
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return
+	} else if res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
+	}
+	return
+}
+
+func checkState(exposedVal, privateVal string) (err error) {
+	if strings.Compare(exposedVal, "") == 0 {
+		err = errors.New("exposed value is empty")
+		return
+	}
+	if strings.Compare(privateVal, "") == 0 {
+		err = errors.New("private value is empty")
+		return
+	}
+
+	bytesVal, err := decode(exposedVal)
 	if err != nil {
 		return
 	}
@@ -265,11 +460,11 @@ func checkState(storedVal string, sess *common.Session) (err error) {
 	macStored := splited[0]
 	stateStored := string(splited[1])
 
-	if !verifyMAC(macStored, []byte(sess.State)) {
+	if !verifyMAC(macStored, []byte(privateVal)) {
 		err = errors.New("invalid mac")
 		return
 	}
-	if strings.Compare(stateStored, sess.State) != 0 {
+	if strings.Compare(stateStored, privateVal) != 0 {
 		err = errors.New("invalid state")
 		return
 	}

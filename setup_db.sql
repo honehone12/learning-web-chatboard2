@@ -1,6 +1,7 @@
 DROP TABLE posts;
 DROP TABLE threads;
 DROP TABLE sessions;
+DROP TABLE visits;
 DROP TABLE users;
 
 CREATE TABLE users (
@@ -20,6 +21,13 @@ CREATE TABLE sessions (
   state      TEXT,
   last_update TIMESTAMP NOT NULL,
   created_at TIMESTAMP NOT NULL   
+);
+
+CREATE TABLE visits (
+  id         SERIAL PRIMARY KEY,
+  uu_id      VARCHAR(255) NOT NULL UNIQUE,
+  state      TEXT,
+  created_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE threads (

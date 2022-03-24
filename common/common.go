@@ -197,6 +197,38 @@ func MakeSessionFromResponse(res *http.Response) (session *Session, err error) {
 	return
 }
 
+func MakeRequestFromVisit(
+	vis *Visit,
+	method string,
+	addr string,
+) (req *http.Request, err error) {
+	bin, err := json.Marshal(vis)
+	if err != nil {
+		return
+	}
+	req, err = http.NewRequest(
+		method,
+		addr,
+		bytes.NewBuffer(bin),
+	)
+	if err != nil {
+		return
+	}
+	req.Header.Add("Content-Type", "application/json")
+	return
+}
+
+func MakeVisitFromResponse(res *http.Response) (vis *Visit, err error) {
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return
+	}
+	vis = &Visit{}
+	err = json.Unmarshal(body, vis)
+	return
+}
+
 func MakeRequestFromThread(
 	thre *Thread,
 	method string,

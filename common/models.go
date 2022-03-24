@@ -13,6 +13,8 @@ type User struct {
 	CreatedAt time.Time `xorm:"not null 'created_at'" json:"created_at"`
 }
 
+// this is private session
+// linked to user
 type Session struct {
 	Id         uint      `xorm:"pk autoincr 'id'" json:"id"`
 	UuId       string    `xorm:"not null unique 'uu_id'" json:"uuid"`
@@ -21,6 +23,15 @@ type Session struct {
 	State      string    `xorm:"TEXT 'state'" json:"state"`
 	LastUpdate time.Time `xorm:"not null 'last_update'" json:"last_update"`
 	CreatedAt  time.Time `xorm:"not null 'created_at'" json:"created_at"`
+}
+
+// this is public session
+// not linked to user
+type Visit struct {
+	Id        uint      `xorm:"pk autoincr 'id'" json:"id"`
+	UuId      string    `xorm:"not null unique 'uu_id'" json:"uuid"`
+	State     string    `xorm:"TEXT 'state'" json:"state"`
+	CreatedAt time.Time `xorm:"not null 'created_at'" json:"created_at"`
 }
 
 type Thread struct {

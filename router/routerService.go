@@ -52,8 +52,7 @@ const (
 )
 
 const (
-	httpPrefix       = "http://"
-	shortTimeSession = "short-time"
+	httpPrefix = "http://"
 )
 
 func handleErrorInternal(
@@ -140,18 +139,24 @@ func errorGet(ctx *gin.Context) {
 }
 
 func loginGet(ctx *gin.Context) {
+	state := getStateFromCTX(ctx)
 	ctx.HTML(
 		http.StatusOK,
 		"login.html",
-		nil,
+		gin.H{
+			"state": state,
+		},
 	)
 }
 
 func signupGet(ctx *gin.Context) {
+	state := getStateFromCTX(ctx)
 	ctx.HTML(
 		http.StatusOK,
 		"signup.html",
-		nil,
+		gin.H{
+			"state": state,
+		},
 	)
 }
 
@@ -167,7 +172,7 @@ func logoutGet(ctx *gin.Context) {
 }
 
 func logoutGetInternal(ctx *gin.Context) (err error) {
-	sess, err := getSessionPtr(ctx)
+	sess, err := getSessionPtrFromCTX(ctx)
 	if err != nil {
 		return
 	}
@@ -196,6 +201,18 @@ func signupPost(ctx *gin.Context) {
 }
 
 func signupPostInternal(ctx *gin.Context) (err error) {
+	vis, err := getVisitPtrFromCTX(ctx)
+	if err != nil {
+		return
+	}
+
+	// check state
+	state := ctx.PostForm("state")
+	err = checkState(state, vis.State)
+	if err != nil {
+		return
+	}
+
 	pw := processPassword(ctx.PostForm("password"))
 	newUser := common.User{
 		Name:     ctx.PostForm("name"),
@@ -227,6 +244,18 @@ func authenticatePost(ctx *gin.Context) {
 }
 
 func authenticatePostInternal(ctx *gin.Context) (err error) {
+	vis, err := getVisitPtrFromCTX(ctx)
+	if err != nil {
+		return
+	}
+
+	// check state
+	state := ctx.PostForm("state")
+	err = checkState(state, vis.State)
+	if err != nil {
+		return
+	}
+
 	authUser := common.User{
 		Email: ctx.PostForm("email"),
 	}
@@ -288,15 +317,7 @@ func threadGet(ctx *gin.Context) {
 	}
 
 	navbar, reply := getHTMLElemntInternal(confirmLoggedIn(ctx))
-	// set state
-	var state string
-	if confirmLoggedIn(ctx) {
-		state, err = generateState(ctx)
-		if err != nil {
-			handleErrorInternal(err.Error(), ctx, "failed to read thread")
-			return
-		}
-	}
+	state := getStateFromCTX(ctx)
 
 	ctx.HTML(
 		http.StatusOK,
@@ -361,12 +382,14 @@ func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.
 func newThreadGet(ctx *gin.Context) {
 	loggedin := confirmLoggedIn(ctx)
 	navbar, _ := getHTMLElemntInternal(loggedin)
+	state := getStateFromCTX(ctx)
 	if loggedin {
 		ctx.HTML(
 			http.StatusOK,
 			"newthread.html",
 			gin.H{
 				"navbar": navbar,
+				"state":  state,
 			},
 		)
 	} else {
@@ -390,7 +413,14 @@ func newThreadPost(ctx *gin.Context) {
 }
 
 func newThreadPostInternal(ctx *gin.Context) (err error) {
-	sess, err := getSessionPtr(ctx)
+	sess, err := getSessionPtrFromCTX(ctx)
+	if err != nil {
+		return
+	}
+
+	// check state
+	state := ctx.PostForm("state")
+	err = checkState(state, sess.State)
 	if err != nil {
 		return
 	}
@@ -430,14 +460,14 @@ func newReplyPost(ctx *gin.Context) {
 }
 
 func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
-	sess, err := getSessionPtr(ctx)
+	sess, err := getSessionPtrFromCTX(ctx)
 	if err != nil {
 		return
 	}
 
 	// check state
 	state := ctx.PostForm("state")
-	err = checkState(state, sess)
+	err = checkState(state, sess.State)
 	if err != nil {
 		return
 	}

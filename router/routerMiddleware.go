@@ -4,6 +4,7 @@ import (
 	"errors"
 	"learning-web-chatboard2/common"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -11,7 +12,22 @@ import (
 const (
 	loggedInLabel   = "logged-in"
 	sessionPtrLabel = "session-ptr"
+	visitPtrLabel   = "visit-ptr"
+	stateLabel      = "state"
 )
+
+func VisitCheckMiddleware(ctx *gin.Context) {
+	err := visitCheck(ctx)
+	if err != nil {
+		if gin.IsDebugging() {
+			common.LogError(logger).Fatalln(err.Error())
+		} else {
+			common.LogError(logger).Printf("!!MIDDLEWARE ERROR!! %s\n", err.Error())
+			return
+		}
+	}
+	ctx.Next()
+}
 
 func LoggedInCheckerMiddleware(ctx *gin.Context) {
 	err := checkLoggedIn(ctx)
@@ -22,65 +38,107 @@ func LoggedInCheckerMiddleware(ctx *gin.Context) {
 	ctx.Next()
 }
 
-func checkLoggedIn(ctx *gin.Context) (err error) {
-	uuid, err := pickupSessionCookie(ctx)
-	if err != nil {
+func GenerateSessionStateMiddleware(ctx *gin.Context) {
+	if !confirmLoggedIn(ctx) {
 		return
 	}
-	sess := common.Session{
-		UuId: uuid,
-	}
-	req, err := common.MakeRequestFromSession(
-		&sess,
-		http.MethodPost,
-		buildHTTP_URL(config.AddressUsers, "/check-session"),
-	)
-	if err != nil {
-		return
-	}
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return
-	} else if res.StatusCode != http.StatusOK {
-		err = errors.New(res.Status)
-		return
-	}
-	sessPtr, err := common.MakeSessionFromResponse(res)
-	if err != nil {
-		return
-	}
-	// update session
 
-	// if time.Since(sessPtr.LastUpdate) > time.Second*1 {
-	// 	storeSessionCookie(ctx, sess.UuId)
-	// 	requestSessionUpdate(sessPtr)
-	// }
-	ctx.Set(sessionPtrLabel, sessPtr)
-	return
+	state, err := generateSessionState(ctx)
+	if err != nil {
+		if gin.IsDebugging() {
+			common.LogError(logger).Fatalln(err.Error())
+		} else {
+			common.LogError(logger).Printf("!!MIDDLEWARE NOTWORKING!! %s\n", err.Error())
+		}
+	}
+	ctx.Set(stateLabel, state)
+	ctx.Next()
+}
+
+func GenerateVisitStateMiddleware(ctx *gin.Context) {
+	state, err := generateVisitState(ctx)
+	if err != nil {
+		// safety for invalid cookie
+		if strings.Compare(err.Error(), "invalid cookie") == 0 {
+			ctx.Redirect(http.StatusFound, "/")
+			return
+		}
+
+		if gin.IsDebugging() {
+			common.LogError(logger).Fatalln(err.Error())
+		} else {
+			common.LogError(logger).Printf("!!MIDDLEWARE NOTWORKING!! %s\n", err.Error())
+		}
+	}
+	ctx.Set(stateLabel, state)
+	ctx.Next()
 }
 
 func confirmLoggedIn(ctx *gin.Context) (isLoggedIn bool) {
 	loggedInVal, ok := ctx.Get(loggedInLabel)
 	if !ok {
-		common.LogError(logger).Fatalln("middleware not working")
+		if gin.IsDebugging() {
+			common.LogError(logger).Fatalln("logged-in not stored")
+		} else {
+			common.LogError(logger).Println("!!MIDDLEWARE NOT WORKING!! logged-in not stored")
+		}
 		return
 	}
 	isLoggedIn, ok = loggedInVal.(bool)
 	if !ok {
-		common.LogError(logger).Fatalln("middleware not working")
+		if gin.IsDebugging() {
+			common.LogError(logger).Fatalln("logged-in is not boolean")
+		} else {
+			common.LogError(logger).Println("!!MIDDLEWARE BROKEN!! logged-in is not boolean")
+		}
 	}
 	return
 }
 
-func getSessionPtr(ctx *gin.Context) (ptr *common.Session, err error) {
+func getSessionPtrFromCTX(ctx *gin.Context) (ptr *common.Session, err error) {
 	val, ok := ctx.Get(sessionPtrLabel)
 	if !ok {
 		err = errors.New("not logged in")
 		return
 	}
 	if ptr, ok = val.(*common.Session); !ok {
-		common.LogError(logger).Fatalln("middleware not working")
-		err = errors.New("middleware not working")
+		if gin.IsDebugging() {
+			common.LogError(logger).Fatalln("session-ptr is not *Session")
+		}
+		err = errors.New("!!MIDDLEWARE BROKEN!! session-ptr is not *Session")
+	}
+	return
+}
+
+func getVisitPtrFromCTX(ctx *gin.Context) (ptr *common.Visit, err error) {
+	val, ok := ctx.Get(visitPtrLabel)
+	if !ok {
+		err = errors.New("visit-ptr is not stored")
+		return
+	}
+	if ptr, ok = val.(*common.Visit); !ok {
+		if gin.IsDebugging() {
+			common.LogError(logger).Fatalln("visit-ptr is not *Visit")
+		}
+		err = errors.New("!!MIDDLEWARE BROKEN!! visit-ptr is not *Visit")
+	}
+	return
+}
+
+func getStateFromCTX(ctx *gin.Context) (state string) {
+	val, ok := ctx.Get(stateLabel)
+	if !ok {
+		if gin.IsDebugging() {
+			common.LogWarning(logger).Println("state not generated yet")
+		}
+		return
+	}
+	if state, ok = val.(string); !ok {
+		if gin.IsDebugging() {
+			common.LogError(logger).Fatalln("state is not string")
+		} else {
+			common.LogError(logger).Println("!!MIDDLEWARE BROKEN!! state is not string")
+		}
 	}
 	return
 }
