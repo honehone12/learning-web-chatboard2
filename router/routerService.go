@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	"io"
 	"learning-web-chatboard2/common"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -42,7 +42,6 @@ const (
     <form id="post" role="form" action="/thread/post" method="post">
 	  <div class="form-group">
 	    <textarea class="form-control" name="body" id="body" placeholder="Write your reply here" rows="3"></textarea>
-	     <!-- get url with javascript? <input type="hidden" name="uuid" value=""> -->
 	     <br/>
 	     <button class="btn btn-primary pull-right" type="submit">Reply</button>
 	  </div>
@@ -51,9 +50,7 @@ const (
 </div>`
 )
 
-const (
-	httpPrefix = "http://"
-)
+const httpPrefix = "http://"
 
 func handleErrorInternal(
 	loggerErrorMsg string,
@@ -201,14 +198,7 @@ func signupPost(ctx *gin.Context) {
 }
 
 func signupPostInternal(ctx *gin.Context) (err error) {
-	vis, err := getVisitPtrFromCTX(ctx)
-	if err != nil {
-		return
-	}
-
-	// check state
-	state := ctx.PostForm("state")
-	err = checkState(state, vis.State)
+	_, err = visitStateCheckProcess(ctx)
 	if err != nil {
 		return
 	}
@@ -219,6 +209,7 @@ func signupPostInternal(ctx *gin.Context) (err error) {
 		Email:    ctx.PostForm("email"),
 		Password: pw,
 	}
+
 	req, err := common.MakeRequestFromUser(
 		&newUser,
 		http.MethodPost,
@@ -244,14 +235,7 @@ func authenticatePost(ctx *gin.Context) {
 }
 
 func authenticatePostInternal(ctx *gin.Context) (err error) {
-	vis, err := getVisitPtrFromCTX(ctx)
-	if err != nil {
-		return
-	}
-
-	// check state
-	state := ctx.PostForm("state")
-	err = checkState(state, vis.State)
+	_, err = visitStateCheckProcess(ctx)
 	if err != nil {
 		return
 	}
@@ -282,6 +266,24 @@ func authenticatePostInternal(ctx *gin.Context) (err error) {
 	if strings.Compare(authedUser.Password, pw) != 0 {
 		err = errors.New("password mismatch")
 		return
+	}
+
+	// delete invalid session data in db first
+	delSess := common.Session{
+		UserName: authedUser.Name,
+		UserId:   authedUser.Id,
+	}
+	req, err = common.MakeRequestFromSession(
+		&delSess,
+		http.MethodPost,
+		buildHTTP_URL(config.AddressUsers, "/delete-session"),
+	)
+	if err != nil {
+		return
+	}
+	res, err = httpClient.Do(req)
+	if err == nil && res.StatusCode != http.StatusOK {
+		err = errors.New(res.Status)
 	}
 
 	req, err = common.MakeRequestFromUser(
@@ -333,7 +335,13 @@ func threadGet(ctx *gin.Context) {
 }
 
 func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.Post, err error) {
-	uuid := ctx.Query("id")
+	base64_uuid := ctx.Query("id")
+	bytes, err := base64.URLEncoding.DecodeString(base64_uuid)
+	if err != nil {
+		return
+	}
+	uuid := string(bytes)
+
 	thre := common.Thread{UuId: uuid}
 	req, err := common.MakeRequestFromThread(
 		&thre,
@@ -376,6 +384,18 @@ func threadGetInternal(ctx *gin.Context) (thread *common.Thread, posts []common.
 		return
 	}
 	err = json.Unmarshal(body, &posts)
+	if err != nil {
+		return
+	}
+
+	// store thread info into visit
+	vis, err := getVisitPtrFromCTX(ctx)
+	if err != nil {
+		return
+	}
+	vis.ThreadId = thread.Id
+	vis.ThreadUuId = thread.UuId
+	err = requestVisitUpdate(vis)
 	return
 }
 
@@ -413,14 +433,7 @@ func newThreadPost(ctx *gin.Context) {
 }
 
 func newThreadPostInternal(ctx *gin.Context) (err error) {
-	sess, err := getSessionPtrFromCTX(ctx)
-	if err != nil {
-		return
-	}
-
-	// check state
-	state := ctx.PostForm("state")
-	err = checkState(state, sess.State)
+	sess, err := sessionStateCheckProcess(ctx)
 	if err != nil {
 		return
 	}
@@ -460,30 +473,23 @@ func newReplyPost(ctx *gin.Context) {
 }
 
 func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
-	sess, err := getSessionPtrFromCTX(ctx)
+	sess, err := sessionStateCheckProcess(ctx)
 	if err != nil {
 		return
 	}
 
-	// check state
-	state := ctx.PostForm("state")
-	err = checkState(state, sess.State)
-	if err != nil {
-		return
-	}
+	// pick up thread info from visit
+	vis, err := getVisitPtrFromCTX(ctx)
+	threId := vis.ThreadId
+	threUuId = vis.ThreadUuId
 
-	threId, err := strconv.Atoi(ctx.PostForm("id"))
-	if err != nil {
-		return
-	}
 	body := ctx.PostForm("body")
-	threUuId = ctx.PostForm("uuid")
 
 	post := common.Post{
 		Body:        body,
 		Contributor: sess.UserName,
 		UserId:      sess.UserId,
-		ThreadId:    uint(threId),
+		ThreadId:    threId,
 	}
 	req, err := common.MakeRequestFromPost(
 		&post,

@@ -20,7 +20,7 @@ func main() {
 		log.Fatalln(err.Error())
 	}
 	//processor data
-	err = newProcessor()
+	err = startHelper()
 	if err != nil {
 		log.Fatalln(err.Error())
 	}

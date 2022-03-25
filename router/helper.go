@@ -32,9 +32,9 @@ const (
 	aes256KeySize uint          = 32
 	macKeySize    uint          = 32
 	stateSize     uint          = 32
-	sessionExp    time.Duration = time.Hour
-	stateExp      time.Duration = time.Minute * 10
-	visitorExp    time.Duration = time.Hour * 24 * 365
+	sessionExp    time.Duration = time.Hour * 8
+	stateExp      time.Duration = time.Minute * 20
+	visitExp      time.Duration = time.Hour * 24 * 365
 )
 
 var helper struct {
@@ -43,7 +43,7 @@ var helper struct {
 }
 
 // every time server is restarted, cookie become no longer valid
-func newProcessor() (err error) {
+func startHelper() (err error) {
 	bKyeStr, err := generateString(aes256KeySize)
 	if err != nil {
 		return
@@ -167,13 +167,6 @@ func checkLoggedIn(ctx *gin.Context) (err error) {
 		return
 	}
 
-	////////////////////////////////////////////////////////////
-	// update session here??
-	// if time.Since(sessPtr.LastUpdate) > time.Second*1 {
-	// 	storeSessionCookie(ctx, sess.UuId)
-	// 	requestSessionUpdate(sessPtr)
-	// }
-
 	ctx.Set(sessionPtrLabel, sessPtr)
 	return
 }
@@ -181,23 +174,22 @@ func checkLoggedIn(ctx *gin.Context) (err error) {
 func visitCheck(ctx *gin.Context) (err error) {
 	var vis *common.Visit
 	_, err = pickupCookie(ctx, visitCookieLabel)
+	if err == nil {
+		vis, err = requestVisitPtr(ctx)
+	}
 	if err != nil {
+		if gin.IsDebugging() {
+			common.LogWarning(logger).
+				Printf("creating new visit because [%s]\n", err.Error())
+		}
 		vis, err = requestVisitCreate()
 		if err != nil {
 			return
 		}
-	} else {
-		vis, err = requestVisitPtr(ctx)
-		if err != nil {
-			vis, err = requestVisitCreate()
-			if err != nil {
-				return
-			}
-		}
-
+		storeVisitCookie(ctx, vis.UuId)
 	}
+
 	ctx.Set(visitPtrLabel, vis)
-	storeVisitCookie(ctx, vis.UuId)
 	err = nil
 	return
 }
@@ -218,7 +210,7 @@ func storeVisitCookie(ctx *gin.Context, value string) (err error) {
 		ctx,
 		value,
 		visitCookieLabel,
-		visitorExp,
+		visitExp,
 		60*60*24*365,
 	)
 	return
@@ -231,7 +223,7 @@ func storeCookie(
 	sessionDuration time.Duration,
 	cookieDuration int,
 ) (err error) {
-	//add exp 1h
+	//add exp
 	value = fmt.Sprintf(
 		"%s|%d",
 		value,
@@ -250,6 +242,10 @@ func storeCookie(
 
 	valToStore := encode(bytesVal)
 
+	if gin.IsDebugging() {
+		common.LogInfo(logger).
+			Printf("stored cookie [%s] %s\n", cookieName, valToStore)
+	}
 	ctx.SetSameSite(http.SameSiteStrictMode)
 	ctx.SetCookie(
 		cookieName,
@@ -276,7 +272,7 @@ func pickupCookie(ctx *gin.Context, name string) (value string, err error) {
 	mac := splited[0]
 	encrypted := splited[1]
 	if !verifyMAC(mac, encrypted) {
-		err = errors.New("invalid cookie")
+		err = fmt.Errorf("invalid cookie %s", rawStored)
 		return
 	}
 	decrypted, err := decrypt(encrypted)
@@ -293,9 +289,6 @@ func pickupCookie(ctx *gin.Context, name string) (value string, err error) {
 		return
 	}
 
-	////////////////////////////////////////////////
-	// exp should be updated here ??
-	//
 	if unixTime < time.Now().Unix() {
 		err = errors.New("session expired")
 	}
@@ -347,7 +340,7 @@ func generateState() (stateRaw, stateAndMACEncoded string, err error) {
 		"%s|%d",
 		state,
 		time.Now().Add(stateExp).Unix(),
-	) // 10m later
+	)
 	stateRaw = state
 
 	// same proc with cookie
@@ -480,5 +473,43 @@ func checkState(exposedVal, privateVal string) (err error) {
 	if unixTime < time.Now().Unix() {
 		err = errors.New("state expired")
 	}
+	return
+}
+
+func visitStateCheckProcess(ctx *gin.Context) (vis *common.Visit, err error) {
+	vis, err = getVisitPtrFromCTX(ctx)
+	if err != nil {
+		return
+	}
+
+	// check state
+	state := ctx.PostForm("state")
+	err = checkState(state, vis.State)
+	if err != nil {
+		return
+	}
+
+	// state is consumed, delete it
+	vis.State = ""
+	err = requestVisitUpdate(vis)
+	return
+}
+
+func sessionStateCheckProcess(ctx *gin.Context) (sess *common.Session, err error) {
+	sess, err = getSessionPtrFromCTX(ctx)
+	if err != nil {
+		return
+	}
+
+	// check state
+	state := ctx.PostForm("state")
+	err = checkState(state, sess.State)
+	if err != nil {
+		return
+	}
+
+	// state is consumed, delete it
+	sess.State = ""
+	err = requestSessionUpdate(sess)
 	return
 }

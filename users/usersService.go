@@ -191,9 +191,8 @@ func updateSessionInternal(ctx *gin.Context, sess *common.Session) (err error) {
 	if common.IsEmpty(
 		sess.UuId,
 		sess.UserName,
-		sess.State,
 	) {
-		err = fmt.Errorf("contains empty string %s %s %s", sess.UuId, sess.UserName, sess.State)
+		err = fmt.Errorf("contains empty string %s %s", sess.UuId, sess.UserName)
 		return
 	}
 	sess.LastUpdate = time.Now()
@@ -218,7 +217,6 @@ func updateVisitInternal(ctx *gin.Context, vis *common.Visit) (err error) {
 	}
 	if common.IsEmpty(
 		vis.UuId,
-		vis.State,
 	) {
 		err = fmt.Errorf("contains empty string %s %s", vis.UuId, vis.State)
 		return

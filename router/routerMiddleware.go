@@ -51,6 +51,7 @@ func GenerateSessionStateMiddleware(ctx *gin.Context) {
 			common.LogError(logger).Printf("!!MIDDLEWARE NOTWORKING!! %s\n", err.Error())
 		}
 	}
+	ctx.Header("Cache-Control", "no-store")
 	ctx.Set(stateLabel, state)
 	ctx.Next()
 }
@@ -70,9 +71,13 @@ func GenerateVisitStateMiddleware(ctx *gin.Context) {
 			common.LogError(logger).Printf("!!MIDDLEWARE NOTWORKING!! %s\n", err.Error())
 		}
 	}
+
+	ctx.Header("Cache-Control", "no-store")
 	ctx.Set(stateLabel, state)
 	ctx.Next()
 }
+
+// belowes are related utils ///////////////////////////////////////
 
 func confirmLoggedIn(ctx *gin.Context) (isLoggedIn bool) {
 	loggedInVal, ok := ctx.Get(loggedInLabel)
@@ -128,9 +133,7 @@ func getVisitPtrFromCTX(ctx *gin.Context) (ptr *common.Visit, err error) {
 func getStateFromCTX(ctx *gin.Context) (state string) {
 	val, ok := ctx.Get(stateLabel)
 	if !ok {
-		if gin.IsDebugging() {
-			common.LogWarning(logger).Println("state not generated yet")
-		}
+		common.LogWarning(logger).Println("state not generated yet")
 		return
 	}
 	if state, ok = val.(string); !ok {

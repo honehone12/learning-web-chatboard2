@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/base64"
 	"time"
 )
 
@@ -28,10 +29,12 @@ type Session struct {
 // this is public session
 // not linked to user
 type Visit struct {
-	Id        uint      `xorm:"pk autoincr 'id'" json:"id"`
-	UuId      string    `xorm:"not null unique 'uu_id'" json:"uuid"`
-	State     string    `xorm:"TEXT 'state'" json:"state"`
-	CreatedAt time.Time `xorm:"not null 'created_at'" json:"created_at"`
+	Id         uint      `xorm:"pk autoincr 'id'" json:"id"`
+	UuId       string    `xorm:"not null unique 'uu_id'" json:"uuid"`
+	State      string    `xorm:"TEXT 'state'" json:"state"`
+	ThreadId   uint      `xorm:"thread_id" json:"thread_id"`
+	ThreadUuId string    `xorm:"thread_uu_id" json:"thread_uuid"`
+	CreatedAt  time.Time `xorm:"not null 'created_at'" json:"created_at"`
 }
 
 type Thread struct {
@@ -61,4 +64,8 @@ func (thread *Thread) When() string {
 
 func (post *Post) When() string {
 	return post.CreatedAt.Format("2006/Jan/2 at 3:04pm")
+}
+
+func (thread *Thread) PublicURL() string {
+	return base64.URLEncoding.EncodeToString([]byte(thread.UuId))
 }

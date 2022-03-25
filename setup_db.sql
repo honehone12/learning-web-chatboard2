@@ -14,20 +14,22 @@ CREATE TABLE users (
 );
 
 CREATE TABLE sessions (
-  id         SERIAL PRIMARY KEY,
-  uu_id      VARCHAR(255) NOT NULL UNIQUE,
-  user_name  VARCHAR(255),
-  user_id    SERIAL REFERENCES users(id),
-  state      TEXT,
+  id          SERIAL PRIMARY KEY,
+  uu_id       VARCHAR(255) NOT NULL UNIQUE,
+  user_name   VARCHAR(255),
+  user_id     SERIAL REFERENCES users(id),
+  state       TEXT,
   last_update TIMESTAMP NOT NULL,
-  created_at TIMESTAMP NOT NULL   
+  created_at  TIMESTAMP NOT NULL   
 );
 
 CREATE TABLE visits (
-  id         SERIAL PRIMARY KEY,
-  uu_id      VARCHAR(255) NOT NULL UNIQUE,
-  state      TEXT,
-  created_at TIMESTAMP NOT NULL
+  id           SERIAL PRIMARY KEY,
+  uu_id        VARCHAR(255) NOT NULL UNIQUE,
+  state        TEXT,
+  thread_uu_id TEXT,
+  thread_id    SERIAL,
+  created_at   TIMESTAMP NOT NULL
 );
 
 CREATE TABLE threads (
