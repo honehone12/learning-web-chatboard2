@@ -18,7 +18,7 @@ import (
 
 type Configuration struct {
 	//should address be in envs or args ??
-	AdressRouter       string `json:"address_router"`
+	AddressRouter      string `json:"address_router"`
 	AddressUsers       string `json:"address_users"`
 	AddressThreads     string `json:"address_threads"`
 	DbName             string `json:"db_name"`

@@ -83,5 +83,5 @@ func main() {
 	threadsRoute.POST("/post", newReplyPost)
 
 	httpClient = http.DefaultClient
-	webEngine.Run(config.AdressRouter)
+	webEngine.Run(config.AddressRouter)
 }

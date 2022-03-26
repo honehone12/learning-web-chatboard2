@@ -252,7 +252,7 @@ func storeCookie(
 		valToStore,
 		cookieDuration,
 		"/",
-		"localhost",
+		config.AddressRouter,
 		true,
 		true,
 	)
