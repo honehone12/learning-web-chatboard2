@@ -21,6 +21,8 @@ type Configuration struct {
 	AddressRouter      string `json:"address_router"`
 	AddressUsers       string `json:"address_users"`
 	AddressThreads     string `json:"address_threads"`
+	UseSecureCookie    bool   `json:"use_secure_cookie"`
+	SetHttpOnlyCookie  bool   `json:"set_http_only_cookie"`
 	DbName             string `json:"db_name"`
 	ShowSQL            bool   `json:"show_sql"`
 	LogToFile          bool   `json:"log_to_file"`

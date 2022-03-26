@@ -2,6 +2,8 @@
     "address_router": "localhost:8080",
     "address_users": "localhost:8081",
     "address_threads": "localhost:8082",
+    "use_secure_cookie": true,
+    "set_http_only_cookie": true,
     "db_name": "chatboard",
     "show_sql": true,
     "log_to_file": false,

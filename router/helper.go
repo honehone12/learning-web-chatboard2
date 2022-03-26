@@ -253,8 +253,8 @@ func storeCookie(
 		cookieDuration,
 		"/",
 		config.AddressRouter,
-		true,
-		true,
+		config.UseSecureCookie,
+		config.SetHttpOnlyCookie,
 	)
 	return
 }
