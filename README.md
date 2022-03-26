@@ -5,5 +5,7 @@ refering to https://github.com/mushahiroyuki/gowebprog<br>
 <h1>todo:</h1>
 <ul>
 <li>currently view is broken</li>
-<li>get methods returns everything in db.</li>
+<li>get methods returns everything in db</li>
+<li>use more appropriate http method</li>
+<li>return more appropriate http status code</li>  
 </ul>
