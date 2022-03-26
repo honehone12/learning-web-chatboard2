@@ -8,4 +8,5 @@ refering to https://github.com/mushahiroyuki/gowebprog<br>
 <li>get methods returns everything in db</li>
 <li>use more appropriate http method</li>
 <li>return more appropriate http status code</li>  
+<li>add more appropriate http headers</li>
 </ul>
