@@ -469,7 +469,8 @@ func newReplyPost(ctx *gin.Context) {
 		handleErrorInternal(err.Error(), ctx, "failed to reply")
 		return
 	}
-	ctx.Redirect(http.StatusFound, fmt.Sprint("/thread/read?id=", threUuId))
+	encoded := encode([]byte(threUuId))
+	ctx.Redirect(http.StatusFound, fmt.Sprint("/thread/read?id=", encoded))
 }
 
 func newReplyPostInternal(ctx *gin.Context) (threUuId string, err error) {
