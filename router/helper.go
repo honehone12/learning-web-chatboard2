@@ -252,7 +252,7 @@ func storeCookie(
 		valToStore,
 		cookieDuration,
 		"/",
-		config.AddressRouter,
+		config.AddressRouter, //this value should be empty. but for same domain different port.
 		config.UseSecureCookie,
 		config.SetHttpOnlyCookie,
 	)
